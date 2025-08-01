@@ -129,6 +129,20 @@ def sample() -> None:
 
 
 @main.command()
+def repl() -> None:
+    """Start interactive REPL client."""
+    try:
+        # Import the client module which will automatically select the best REPL
+        from client import repl_main
+        repl_main()
+    except ImportError:
+        console.print("[red]Error: Client module not found. Make sure you're running from the project root.[/red]")
+        console.print("[dim]Try: python -m client.enhanced_repl[/dim]")
+    except KeyboardInterrupt:
+        console.print("\n[yellow]REPL interrupted[/yellow]")
+
+
+@main.command()
 @click.option("--database", "-d", default=None, help="DuckDB database file (default: in-memory)")
 def setup(database: Any) -> None:
     """Set up sample data for testing."""
