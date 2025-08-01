@@ -25,14 +25,16 @@ class QueryResult:
 class MockhausExecutor:
     """Executes translated SQL queries using DuckDB."""
 
-    def __init__(self, database_path: str | None = None) -> None:
+    def __init__(self, database_path: str | None = None, use_ast_parser: bool = True) -> None:
         """
         Initialize the executor.
 
         Args:
             database_path: Path to DuckDB database file. If None, uses in-memory database.
+            use_ast_parser: Whether to use AST parser for ingestion statements (default: True).
         """
         self.database_path = database_path
+        self.use_ast_parser = use_ast_parser
         self.translator = SnowflakeToDuckDBTranslator()
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._ingestion_handler: SnowflakeIngestionHandler | None = None
@@ -73,8 +75,8 @@ class MockhausExecutor:
         if not self._connection:
             return
 
-        # Initialize ingestion handler
-        self._ingestion_handler = SnowflakeIngestionHandler(self._connection)
+        # Initialize ingestion handler with parser preference
+        self._ingestion_handler = SnowflakeIngestionHandler(self._connection, self.use_ast_parser)
 
     def execute_snowflake_sql(self, snowflake_sql: str) -> QueryResult:
         """
