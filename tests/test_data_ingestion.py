@@ -45,7 +45,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.translated_sql == "-- Created stage test_user_stage"
         
         # Verify stage was stored
-        stage = self.executor._stage_manager.get_stage("test_user_stage")
+        stage = self.executor._ingestion_handler.stage_manager.get_stage("test_user_stage")
         assert stage is not None
         assert stage.name == "test_user_stage"
         assert stage.stage_type == "USER"
@@ -60,7 +60,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
         
         # Verify stage was stored with correct path
-        stage = self.executor._stage_manager.get_stage("test_external_stage")
+        stage = self.executor._ingestion_handler.stage_manager.get_stage("test_external_stage")
         assert stage is not None
         assert stage.stage_type == "EXTERNAL"
         assert stage.url == file_url
@@ -76,7 +76,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
         
         # Verify stage was stored
-        stage = self.executor._stage_manager.get_stage("test_s3_stage")
+        stage = self.executor._ingestion_handler.stage_manager.get_stage("test_s3_stage")
         assert stage is not None
         assert stage.stage_type == "EXTERNAL"
         assert stage.url == s3_url
@@ -89,7 +89,7 @@ class TestDataIngestion(unittest.TestCase):
         self.executor.execute_snowflake_sql("CREATE STAGE test_drop_stage")
         
         # Verify it exists
-        stage = self.executor._stage_manager.get_stage("test_drop_stage")
+        stage = self.executor._ingestion_handler.stage_manager.get_stage("test_drop_stage")
         assert stage is not None
         
         # Drop it
@@ -97,7 +97,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
         
         # Verify it's gone
-        stage = self.executor._stage_manager.get_stage("test_drop_stage")
+        stage = self.executor._ingestion_handler.stage_manager.get_stage("test_drop_stage")
         assert stage is None
 
     def test_create_csv_file_format(self) -> None:
@@ -110,7 +110,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.translated_sql == "-- Created file format test_csv_format"
         
         # Verify format was stored
-        format_obj = self.executor._format_manager.get_format("test_csv_format")
+        format_obj = self.executor._ingestion_handler.format_manager.get_format("test_csv_format")
         assert format_obj is not None
         assert format_obj.name == "test_csv_format"
         assert format_obj.format_type == "CSV"
@@ -126,7 +126,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
         
         # Verify format was stored
-        format_obj = self.executor._format_manager.get_format("test_json_format")
+        format_obj = self.executor._ingestion_handler.format_manager.get_format("test_json_format")
         assert format_obj is not None
         assert format_obj.format_type == "JSON"
 
@@ -136,7 +136,7 @@ class TestDataIngestion(unittest.TestCase):
         self.executor.execute_snowflake_sql("CREATE FILE FORMAT test_drop_format TYPE = 'CSV'")
         
         # Verify it exists
-        format_obj = self.executor._format_manager.get_format("test_drop_format")
+        format_obj = self.executor._ingestion_handler.format_manager.get_format("test_drop_format")
         assert format_obj is not None
         
         # Drop it
@@ -144,7 +144,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
         
         # Verify it's gone
-        format_obj = self.executor._format_manager.get_format("test_drop_format")
+        format_obj = self.executor._ingestion_handler.format_manager.get_format("test_drop_format")
         assert format_obj is None
 
     def test_copy_into_with_named_format(self) -> None:
@@ -304,7 +304,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_stage_path_resolution(self) -> None:
         """Test various stage path resolution patterns."""
-        stage_manager = self.executor._stage_manager
+        stage_manager = self.executor._ingestion_handler.stage_manager
         
         # Test user stage resolution
         user_path = stage_manager.resolve_stage_path("@~/test.csv")
@@ -323,7 +323,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_file_format_property_mapping(self) -> None:
         """Test mapping of file format properties to DuckDB options."""
-        format_manager = self.executor._format_manager
+        format_manager = self.executor._ingestion_handler.format_manager
         
         # Create a CSV format with various properties
         csv_format = format_manager.create_format("test_mapping", "CSV", {
@@ -346,7 +346,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_inline_format_parsing(self) -> None:
         """Test parsing of inline format specifications."""
-        format_manager = self.executor._format_manager
+        format_manager = self.executor._ingestion_handler.format_manager
         
         inline_spec = "TYPE = 'CSV' FIELD_DELIMITER = '|' SKIP_HEADER = 1 FIELD_OPTIONALLY_ENCLOSED_BY = '\"'"
         options = format_manager.parse_inline_format(inline_spec)
@@ -358,7 +358,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_default_file_formats(self) -> None:
         """Test that default file formats are created."""
-        format_manager = self.executor._format_manager
+        format_manager = self.executor._ingestion_handler.format_manager
         
         # Check that default formats exist
         csv_default = format_manager.get_format("CSV_DEFAULT")
@@ -375,7 +375,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_list_stages(self) -> None:
         """Test listing all stages."""
-        stage_manager = self.executor._stage_manager
+        stage_manager = self.executor._ingestion_handler.stage_manager
         
         # Create some stages
         stage_manager.create_stage("stage1", "USER")
@@ -391,7 +391,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_list_file_formats(self) -> None:
         """Test listing all file formats."""
-        format_manager = self.executor._format_manager
+        format_manager = self.executor._ingestion_handler.format_manager
         
         # Create a custom format
         format_manager.create_format("custom_csv", "CSV", {"field_delimiter": ";"})
@@ -408,7 +408,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_stage_validation(self) -> None:
         """Test stage access validation."""
-        stage_manager = self.executor._stage_manager
+        stage_manager = self.executor._ingestion_handler.stage_manager
         
         # Test valid stage reference (directory exists)
         file_url = f"file://{self.test_data_dir}"
