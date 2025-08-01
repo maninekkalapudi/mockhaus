@@ -198,25 +198,53 @@ def format_results(result: dict) -> str:
     if not data:
         return "✅ Query executed successfully (no results)"
     
-    # Simple table formatting
+    # Dynamic table formatting with proper column widths
     if len(data) > 0:
         headers = list(data[0].keys())
         output = []
         
-        # Header row
-        header_line = " | ".join(f"{h:>12}" for h in headers)
-        output.append(header_line)
-        output.append("-" * len(header_line))
+        # Calculate column widths based on content
+        col_widths = {}
+        display_data = data[:10]  # Only calculate for displayed rows
         
-        # Data rows (limit to first 10)
-        for row in data[:10]:
-            row_values = []
+        for header in headers:
+            # Start with header width
+            max_width = len(str(header))
+            
+            # Check data widths
+            for row in display_data:
+                value = row.get(header, '')
+                str_value = str(value) if value is not None else ''
+                max_width = max(max_width, len(str_value))
+            
+            # Cap at reasonable maximum, but allow more than 12 chars
+            col_widths[header] = min(max_width, 50)
+        
+        # Header row
+        header_parts = []
+        separator_parts = []
+        for header in headers:
+            width = col_widths[header]
+            header_parts.append(f"{header:<{width}}")
+            separator_parts.append("-" * width)
+        
+        output.append(" | ".join(header_parts))
+        output.append("-+-".join(separator_parts))
+        
+        # Data rows
+        for row in display_data:
+            row_parts = []
             for header in headers:
                 value = row.get(header, '')
-                # Truncate long values
-                str_value = str(value)[:12] if value is not None else ''
-                row_values.append(f"{str_value:>12}")
-            output.append(" | ".join(row_values))
+                str_value = str(value) if value is not None else ''
+                width = col_widths[header]
+                
+                # Truncate if necessary but show more than before
+                if len(str_value) > width:
+                    str_value = str_value[:width-3] + "..."
+                
+                row_parts.append(f"{str_value:<{width}}")
+            output.append(" | ".join(row_parts))
         
         if len(data) > 10:
             output.append(f"... and {len(data) - 10} more rows")
