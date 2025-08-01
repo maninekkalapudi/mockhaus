@@ -54,3 +54,8 @@ Thumbs.db
 .env
 .env.local
 docs
+
+# Test data and databases
+.test-data/
+*.db
+test_*.db
