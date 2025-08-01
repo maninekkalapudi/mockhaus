@@ -1,0 +1,193 @@
+"""Query execution engine using DuckDB."""
+
+from dataclasses import dataclass
+from typing import Any
+
+import duckdb
+
+from .translator import SnowflakeToDuckDBTranslator
+
+
+@dataclass
+class QueryResult:
+    """Result of a query execution."""
+
+    success: bool
+    data: list[dict[str, Any]] | None = None
+    columns: list[str] | None = None
+    row_count: int = 0
+    execution_time_ms: float = 0.0
+    error: str | None = None
+    original_sql: str = ""
+    translated_sql: str = ""
+
+
+class MockhausExecutor:
+    """Executes translated SQL queries using DuckDB."""
+
+    def __init__(self, database_path: str | None = None) -> None:
+        """
+        Initialize the executor.
+
+        Args:
+            database_path: Path to DuckDB database file. If None, uses in-memory database.
+        """
+        self.database_path = database_path
+        self.translator = SnowflakeToDuckDBTranslator()
+        self._connection: duckdb.DuckDBPyConnection | None = None
+
+    def connect(self) -> None:
+        """Establish connection to DuckDB."""
+        if self._connection is None:
+            # Use ":memory:" for in-memory database when path is None
+            db_path = (
+                self.database_path if self.database_path is not None else ":memory:"
+            )
+            self._connection = duckdb.connect(db_path)
+            self._setup_database()
+
+    def disconnect(self) -> None:
+        """Close the DuckDB connection."""
+        if self._connection:
+            self._connection.close()
+            self._connection = None
+
+    def _setup_database(self) -> None:
+        """Set up the database with initial configuration."""
+        if not self._connection:
+            return
+
+        # Set up some basic configuration that might help with Snowflake compatibility
+        try:
+            # Enable case-insensitive string comparisons (closer to Snowflake behavior)
+            # Note: This is a simplified approach, full case-insensitivity would need more work
+            pass
+        except Exception:
+            # Ignore setup errors for now
+            pass
+
+    def execute_snowflake_sql(self, snowflake_sql: str) -> QueryResult:
+        """
+        Execute a Snowflake SQL query by translating it to DuckDB SQL first.
+
+        Args:
+            snowflake_sql: The Snowflake SQL query to execute
+
+        Returns:
+            QueryResult containing the execution results
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            # Ensure we're connected
+            self.connect()
+
+            # Translate the SQL
+            translated_sql = self.translator.translate(snowflake_sql)
+
+            # Execute the translated query
+            result = self._execute_duckdb_sql(translated_sql)
+
+            execution_time = (
+                time.time() - start_time
+            ) * 1000  # Convert to milliseconds
+
+            return QueryResult(
+                success=True,
+                data=result["data"],
+                columns=result["columns"],
+                row_count=result["row_count"],
+                execution_time_ms=execution_time,
+                original_sql=snowflake_sql,
+                translated_sql=translated_sql,
+            )
+
+        except Exception as e:
+            execution_time = (time.time() - start_time) * 1000
+
+            return QueryResult(
+                success=False,
+                error=str(e),
+                execution_time_ms=execution_time,
+                original_sql=snowflake_sql,
+                translated_sql="",
+            )
+
+    def _execute_duckdb_sql(self, duckdb_sql: str) -> dict[str, Any]:
+        """
+        Execute a DuckDB SQL query and return results.
+
+        Args:
+            duckdb_sql: The DuckDB SQL query to execute
+
+        Returns:
+            Dictionary containing query results
+        """
+        if not self._connection:
+            raise RuntimeError("Not connected to database")
+
+        # Execute the query
+        result = self._connection.execute(duckdb_sql)
+
+        # Fetch results
+        rows = result.fetchall()
+        columns = [desc[0] for desc in result.description] if result.description else []
+
+        # Convert to list of dictionaries
+        data = []
+        for row in rows:
+            row_dict = {}
+            for i, value in enumerate(row):
+                if i < len(columns):
+                    row_dict[columns[i]] = value
+            data.append(row_dict)
+
+        return {"data": data, "columns": columns, "row_count": len(rows)}
+
+    def create_sample_data(self) -> None:
+        """Create some sample data for testing."""
+        self.connect()
+
+        if not self._connection:
+            return
+
+        # Create a sample table with various data types
+        sample_ddl = """
+        CREATE TABLE IF NOT EXISTS sample_customers (
+            customer_id INTEGER,
+            customer_name VARCHAR(100),
+            email VARCHAR(255),
+            signup_date DATE,
+            last_login TIMESTAMP,
+            is_active BOOLEAN,
+            account_balance DECIMAL(10,2)
+        )
+        """
+
+        sample_data = """
+        INSERT INTO sample_customers VALUES
+        (1, 'Alice Johnson', 'alice@example.com', '2023-01-15', '2024-01-15 14:30:00', true, 1250.75),
+        (2, 'Bob Smith', 'bob@example.com', '2023-02-20', '2024-01-14 09:15:00', true, 0.00),
+        (3, 'Charlie Brown', 'charlie@example.com', '2023-03-10', '2024-01-10 16:45:00', false, -50.25),
+        (4, 'Diana Prince', 'diana@example.com', '2023-04-05', '2024-01-16 11:20:00', true, 3750.00),
+        (5, 'Eve Davis', 'eve@example.com', '2023-05-12', '2024-01-13 13:10:00', true, 892.50)
+        """
+
+        try:
+            self._connection.execute(sample_ddl)
+            # Clear existing data first
+            self._connection.execute("DELETE FROM sample_customers")
+            self._connection.execute(sample_data)
+        except Exception as e:
+            print(f"Warning: Could not create sample data: {e}")
+
+    def __enter__(self) -> "MockhausExecutor":
+        """Context manager entry."""
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Context manager exit."""
+        self.disconnect()
