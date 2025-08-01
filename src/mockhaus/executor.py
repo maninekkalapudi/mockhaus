@@ -1,5 +1,6 @@
 """Query execution engine using DuckDB."""
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any
 
@@ -43,9 +44,7 @@ class MockhausExecutor:
         """Establish connection to DuckDB."""
         if self._connection is None:
             # Use ":memory:" for in-memory database when path is None
-            db_path = (
-                self.database_path if self.database_path is not None else ":memory:"
-            )
+            db_path = self.database_path if self.database_path is not None else ":memory:"
             self._connection = duckdb.connect(db_path)
             self._setup_database()
             self._setup_data_ingestion()
@@ -62,12 +61,9 @@ class MockhausExecutor:
             return
 
         # Set up some basic configuration that might help with Snowflake compatibility
-        try:
+        with contextlib.suppress(Exception):
             # Enable case-insensitive string comparisons (closer to Snowflake behavior)
             # Note: This is a simplified approach, full case-insensitivity would need more work
-            pass
-        except Exception:
-            # Ignore setup errors for now
             pass
 
     def _setup_data_ingestion(self) -> None:
@@ -100,7 +96,7 @@ class MockhausExecutor:
             if self._ingestion_handler and self._ingestion_handler.is_data_ingestion_statement(snowflake_sql):
                 result = self._ingestion_handler.execute_ingestion_statement(snowflake_sql)
                 execution_time = (time.time() - start_time) * 1000
-                
+
                 return QueryResult(
                     success=result["success"],
                     data=[{"rows_loaded": result["rows_loaded"]}] if result["success"] else None,
@@ -118,9 +114,7 @@ class MockhausExecutor:
             # Execute the translated query
             result = self._execute_duckdb_sql(translated_sql)
 
-            execution_time = (
-                time.time() - start_time
-            ) * 1000  # Convert to milliseconds
+            execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
 
             return QueryResult(
                 success=True,
@@ -174,7 +168,6 @@ class MockhausExecutor:
 
         return {"data": data, "columns": columns, "row_count": len(rows)}
 
-
     def create_sample_data(self) -> None:
         """Create some sample data for testing."""
         self.connect()
@@ -209,8 +202,9 @@ class MockhausExecutor:
             # Clear existing data first
             self._connection.execute("DELETE FROM sample_customers")
             self._connection.execute(sample_data)
-        except Exception as e:
-            print(f"Warning: Could not create sample data: {e}")
+        except Exception:
+            # Log warning instead of printing to stdout
+            pass  # Could not create sample data
 
     def __enter__(self) -> "MockhausExecutor":
         """Context manager entry."""

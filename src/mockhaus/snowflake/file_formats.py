@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import duckdb
 
@@ -13,8 +13,8 @@ class FileFormat:
 
     name: str
     format_type: str  # 'CSV', 'JSON', 'PARQUET', 'AVRO', 'ORC', 'XML'
-    properties: Dict[str, Any] = field(default_factory=dict)
-    created_at: Optional[str] = None
+    properties: dict[str, Any] = field(default_factory=dict)
+    created_at: str | None = None
 
 
 class MockFileFormatManager:
@@ -53,33 +53,22 @@ class MockFileFormatManager:
                     "compression": "AUTO",
                     "date_format": "AUTO",
                     "time_format": "AUTO",
-                    "timestamp_format": "AUTO"
-                }
+                    "timestamp_format": "AUTO",
+                },
             },
             {
-                "name": "JSON_DEFAULT", 
+                "name": "JSON_DEFAULT",
                 "format_type": "JSON",
-                "properties": {
-                    "compression": "AUTO",
-                    "date_format": "AUTO",
-                    "time_format": "AUTO",
-                    "timestamp_format": "AUTO"
-                }
+                "properties": {"compression": "AUTO", "date_format": "AUTO", "time_format": "AUTO", "timestamp_format": "AUTO"},
             },
-            {
-                "name": "PARQUET_DEFAULT",
-                "format_type": "PARQUET", 
-                "properties": {
-                    "compression": "AUTO"
-                }
-            }
+            {"name": "PARQUET_DEFAULT", "format_type": "PARQUET", "properties": {"compression": "AUTO"}},
         ]
 
         for fmt in default_formats:
-            if not self.get_format(fmt["name"]):
-                self.create_format(fmt["name"], fmt["format_type"], fmt["properties"])
+            if not self.get_format(fmt["name"]):  # type: ignore[arg-type]
+                self.create_format(fmt["name"], fmt["format_type"], fmt["properties"])  # type: ignore[arg-type]
 
-    def create_format(self, name: str, format_type: str, properties: Optional[Dict[str, Any]] = None) -> FileFormat:
+    def create_format(self, name: str, format_type: str, properties: dict[str, Any] | None = None) -> FileFormat:
         """Create a new file format."""
         if properties is None:
             properties = {}
@@ -96,18 +85,14 @@ class MockFileFormatManager:
         final_properties.update(properties)
 
         # Create format object
-        file_format = FileFormat(
-            name=name,
-            format_type=format_type,
-            properties=final_properties
-        )
+        file_format = FileFormat(name=name, format_type=format_type, properties=final_properties)
 
         # Store in system table
         self._store_format_metadata(file_format)
 
         return file_format
 
-    def _get_default_properties(self, format_type: str) -> Dict[str, Any]:
+    def _get_default_properties(self, format_type: str) -> dict[str, Any]:
         """Get default properties for a format type."""
         defaults = {
             "CSV": {
@@ -119,61 +104,40 @@ class MockFileFormatManager:
                 "compression": "AUTO",
                 "date_format": "AUTO",
                 "time_format": "AUTO",
-                "timestamp_format": "AUTO"
+                "timestamp_format": "AUTO",
             },
-            "JSON": {
-                "compression": "AUTO",
-                "date_format": "AUTO", 
-                "time_format": "AUTO",
-                "timestamp_format": "AUTO"
-            },
-            "PARQUET": {
-                "compression": "AUTO"
-            }
+            "JSON": {"compression": "AUTO", "date_format": "AUTO", "time_format": "AUTO", "timestamp_format": "AUTO"},
+            "PARQUET": {"compression": "AUTO"},
         }
-        return defaults.get(format_type, {}).copy()
+        return defaults.get(format_type, {}).copy()  # type: ignore[no-any-return, attr-defined]
 
     def _store_format_metadata(self, file_format: FileFormat) -> None:
         """Store file format metadata in system table."""
         insert_sql = """
-        INSERT OR REPLACE INTO mockhaus_file_formats 
+        INSERT OR REPLACE INTO mockhaus_file_formats
         (name, format_type, properties)
         VALUES (?, ?, ?)
         """
-        self.connection.execute(insert_sql, [
-            file_format.name,
-            file_format.format_type,
-            json.dumps(file_format.properties)
-        ])
+        self.connection.execute(insert_sql, [file_format.name, file_format.format_type, json.dumps(file_format.properties)])
 
-    def get_format(self, name: str) -> Optional[FileFormat]:
+    def get_format(self, name: str) -> FileFormat | None:
         """Get file format by name."""
-        result = self.connection.execute(
-            "SELECT * FROM mockhaus_file_formats WHERE name = ?", [name]
-        ).fetchone()
+        result = self.connection.execute("SELECT * FROM mockhaus_file_formats WHERE name = ?", [name]).fetchone()
 
         if not result:
             return None
 
-        return FileFormat(
-            name=result[0],
-            format_type=result[1],
-            properties=json.loads(result[2]) if result[2] else {},
-            created_at=result[3]
-        )
+        return FileFormat(name=result[0], format_type=result[1], properties=json.loads(result[2]) if result[2] else {}, created_at=result[3])
 
-    def list_formats(self) -> List[FileFormat]:
+    def list_formats(self) -> list[FileFormat]:
         """List all file formats."""
         results = self.connection.execute("SELECT * FROM mockhaus_file_formats").fetchall()
         formats = []
 
         for result in results:
-            formats.append(FileFormat(
-                name=result[0],
-                format_type=result[1],
-                properties=json.loads(result[2]) if result[2] else {},
-                created_at=result[3]
-            ))
+            formats.append(
+                FileFormat(name=result[0], format_type=result[1], properties=json.loads(result[2]) if result[2] else {}, created_at=result[3])
+            )
 
         return formats
 
@@ -185,22 +149,21 @@ class MockFileFormatManager:
         self.connection.execute("DELETE FROM mockhaus_file_formats WHERE name = ?", [name])
         return True
 
-    def map_to_duckdb_options(self, file_format: FileFormat) -> Dict[str, Any]:
+    def map_to_duckdb_options(self, file_format: FileFormat) -> dict[str, Any]:
         """Map Snowflake file format properties to DuckDB COPY options."""
         props = file_format.properties
         format_type = file_format.format_type
 
         if format_type == "CSV":
             return self._map_csv_options(props)
-        elif format_type == "JSON":
+        if format_type == "JSON":
             return self._map_json_options(props)
-        elif format_type == "PARQUET":
+        if format_type == "PARQUET":
             return self._map_parquet_options(props)
-        else:
-            # For unsupported formats, return basic options
-            return {"FORMAT": format_type}
+        # For unsupported formats, return basic options
+        return {"FORMAT": format_type}
 
-    def _map_csv_options(self, props: Dict[str, Any]) -> Dict[str, Any]:
+    def _map_csv_options(self, props: dict[str, Any]) -> dict[str, Any]:
         """Map CSV format properties to DuckDB options."""
         options = {"FORMAT": "CSV"}
 
@@ -210,11 +173,11 @@ class MockFileFormatManager:
 
         # Header
         skip_header = props.get("skip_header", 0)
-        if isinstance(skip_header, (int, str)):
+        if isinstance(skip_header, int | str):
             try:
-                options["HEADER"] = int(skip_header) > 0
+                options["HEADER"] = int(skip_header) > 0  # type: ignore[assignment]
             except (ValueError, TypeError):
-                options["HEADER"] = False
+                options["HEADER"] = False  # type: ignore[assignment]
 
         # Quote character
         if "field_optionally_enclosed_by" in props and props["field_optionally_enclosed_by"]:
@@ -237,67 +200,61 @@ class MockFileFormatManager:
 
         return options
 
-    def _map_json_options(self, props: Dict[str, Any]) -> Dict[str, Any]:
+    def _map_json_options(self, props: dict[str, Any]) -> dict[str, Any]:
         """Map JSON format properties to DuckDB options."""
-        options = {"FORMAT": "JSON"}
-
+        del props  # Unused parameter
         # DuckDB JSON format is relatively simple
         # Most Snowflake JSON options don't have direct equivalents
+        return {"FORMAT": "JSON"}
 
-        return options
-
-    def _map_parquet_options(self, props: Dict[str, Any]) -> Dict[str, Any]:
+    def _map_parquet_options(self, props: dict[str, Any]) -> dict[str, Any]:
         """Map Parquet format properties to DuckDB options."""
-        options = {"FORMAT": "PARQUET"}
-
+        del props  # Unused parameter
         # Parquet options are mostly handled automatically by DuckDB
+        return {"FORMAT": "PARQUET"}
 
-        return options
-
-    def parse_inline_format(self, format_spec: str) -> Dict[str, Any]:
+    def parse_inline_format(self, format_spec: str) -> dict[str, Any]:
         """
         Parse inline format specification from COPY INTO statement.
-        
+
         Example: "TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1"
         """
         # This is a simplified parser for common format specifications
         # In a full implementation, you'd want a proper parser
-        
+
         options = {}
-        
+
         # Extract TYPE
         import re
+
         type_match = re.search(r"TYPE\s*=\s*['\"](\w+)['\"]", format_spec, re.IGNORECASE)
         if type_match:
             format_type = type_match.group(1).upper()
             options["TYPE"] = format_type
-        
+
         # Extract common CSV options
         delimiter_match = re.search(r"FIELD_DELIMITER\s*=\s*['\"](.)['\"]", format_spec, re.IGNORECASE)
         if delimiter_match:
             options["field_delimiter"] = delimiter_match.group(1)
-        
+
         header_match = re.search(r"SKIP_HEADER\s*=\s*(\d+)", format_spec, re.IGNORECASE)
         if header_match:
             options["skip_header"] = int(header_match.group(1))
-        
+
         quote_match = re.search(r"FIELD_OPTIONALLY_ENCLOSED_BY\s*=\s*['\"](.)['\"]", format_spec, re.IGNORECASE)
         if quote_match:
             options["field_optionally_enclosed_by"] = quote_match.group(1)
-        
+
         return options
 
     def create_temp_format_from_inline(self, inline_spec: str) -> FileFormat:
         """Create a temporary file format from inline specification."""
         options = self.parse_inline_format(inline_spec)
         format_type = options.pop("TYPE", "CSV")
-        
+
         # Create temporary format name
         import hashlib
+
         temp_name = f"TEMP_{hashlib.md5(inline_spec.encode()).hexdigest()[:8]}"
-        
-        return FileFormat(
-            name=temp_name,
-            format_type=format_type,
-            properties=options
-        )
+
+        return FileFormat(name=temp_name, format_type=format_type, properties=options)

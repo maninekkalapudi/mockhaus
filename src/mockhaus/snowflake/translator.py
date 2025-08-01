@@ -35,18 +35,12 @@ class SnowflakeToDuckDBTranslator:
             transformed = self._apply_custom_transformations(parsed)
 
             # Generate DuckDB SQL
-            duckdb_sql = transformed.sql(dialect=self.target_dialect, pretty=True)
-
-            return duckdb_sql
+            return transformed.sql(dialect=self.target_dialect, pretty=True)
 
         except Exception as e:
-            raise ValueError(
-                f"Failed to translate SQL: {snowflake_sql}. Error: {str(e)}"
-            ) from e
+            raise ValueError(f"Failed to translate SQL: {snowflake_sql}. Error: {str(e)}") from e
 
-    def _apply_custom_transformations(
-        self, parsed_sql: exp.Expression
-    ) -> exp.Expression:
+    def _apply_custom_transformations(self, parsed_sql: exp.Expression) -> exp.Expression:
         """
         Apply custom transformations for Snowflake-specific patterns.
 
@@ -60,9 +54,7 @@ class SnowflakeToDuckDBTranslator:
         transformed = parsed_sql.transform(self._transform_functions)
 
         # Handle case sensitivity (Snowflake is case-insensitive by default)
-        transformed = self._handle_case_sensitivity(transformed)
-
-        return transformed
+        return self._handle_case_sensitivity(transformed)
 
     def _transform_functions(self, node: exp.Expression) -> exp.Expression:
         """Transform Snowflake-specific functions to DuckDB equivalents."""
@@ -103,9 +95,7 @@ class SnowflakeToDuckDBTranslator:
                 "target_dialect": self.target_dialect,
                 "success": True,
                 "error": None,
-                "transformations_applied": self._get_applied_transformations(
-                    parsed, transformed
-                ),
+                "transformations_applied": self._get_applied_transformations(parsed, transformed),
             }
 
         except Exception as e:
@@ -119,9 +109,7 @@ class SnowflakeToDuckDBTranslator:
                 "transformations_applied": [],
             }
 
-    def _get_applied_transformations(
-        self, original: exp.Expression, transformed: exp.Expression
-    ) -> list[str]:
+    def _get_applied_transformations(self, original: exp.Expression, transformed: exp.Expression) -> list[str]:
         """Get a list of transformations that were applied."""
         transformations = []
 

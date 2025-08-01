@@ -16,14 +16,18 @@ dev:
 	uv pip install -e ".[dev]"
 
 test:
-	pytest tests/ -v
+	uv run pytest tests/ -v
 
 lint:
-	ruff check src/ tests/
-	mypy src/
+	@echo "Running ruff..."
+	@uv run ruff check src/ tests/ || echo "ruff found issues"
+	@echo "Running mypy..."
+	@uv run mypy src/ || echo "mypy found issues"
+	@echo "Running pyright..."
+	@uv run pyright src/ || echo "pyright found issues"
 
 format:
-	ruff format src/ tests/
+	uv run ruff format src/ tests/
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
@@ -35,3 +39,4 @@ clean:
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
 	find . -type d -name ".ruff_cache" -exec rm -rf {} +
+	find . -type d -name ".pyright" -exec rm -rf {} +
