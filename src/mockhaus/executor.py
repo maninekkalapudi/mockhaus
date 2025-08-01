@@ -7,6 +7,7 @@ from typing import Any
 import duckdb
 
 from .snowflake import SnowflakeIngestionHandler, SnowflakeToDuckDBTranslator
+from .snowflake.database_manager import SnowflakeDatabaseManager
 
 
 @dataclass
@@ -39,6 +40,7 @@ class MockhausExecutor:
         self.translator = SnowflakeToDuckDBTranslator()
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._ingestion_handler: SnowflakeIngestionHandler | None = None
+        self._database_manager = SnowflakeDatabaseManager()
 
     def connect(self) -> None:
         """Establish connection to DuckDB."""
@@ -89,6 +91,49 @@ class MockhausExecutor:
         start_time = time.time()
 
         try:
+            # Check if this is a database DDL statement first
+            if self._database_manager.is_database_ddl(snowflake_sql):
+                result = self._database_manager.execute_database_ddl(snowflake_sql)
+                execution_time = (time.time() - start_time) * 1000
+                
+                if result["success"]:
+                    # For USE DATABASE commands, switch to the new database
+                    if "database_path" in result:
+                        self.database_path = result["database_path"]
+                        # Reconnect to the new database
+                        self.disconnect()
+                        self.connect()
+                    
+                    # Format response based on command type
+                    data = None
+                    columns = None
+                    if "databases" in result:
+                        # SHOW DATABASES
+                        data = result["databases"]
+                        columns = ["name", "current", "size_mb", "path"] if data else []
+                    else:
+                        # CREATE/DROP/USE DATABASE
+                        data = [{"message": result["message"]}]
+                        columns = ["message"]
+                    
+                    return QueryResult(
+                        success=True,
+                        data=data,
+                        columns=columns,
+                        row_count=len(data) if data else 0,
+                        execution_time_ms=execution_time,
+                        original_sql=snowflake_sql,
+                        translated_sql="-- Database DDL (no translation needed)",
+                    )
+                else:
+                    return QueryResult(
+                        success=False,
+                        error=result["error"],
+                        execution_time_ms=execution_time,
+                        original_sql=snowflake_sql,
+                        translated_sql="",
+                    )
+
             # Ensure we're connected
             self.connect()
 

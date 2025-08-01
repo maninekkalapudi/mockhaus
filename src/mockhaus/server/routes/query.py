@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from ...executor import MockhausExecutor
 from ..models.request import QueryRequest
 from ..models.response import ErrorResponse, QueryResponse
+from ..session import session_manager
 
 router = APIRouter(tags=["query"])
 
@@ -35,13 +36,32 @@ async def execute_query(request: QueryRequest) -> Any:
     start_time = time.time()
     
     try:
-        with MockhausExecutor(request.database) as executor:
+        # Determine which database to use
+        database_to_use = request.database
+        session_id = request.session_id
+        
+        # If no explicit database provided, check session context
+        if database_to_use is None and session_id:
+            database_to_use = session_manager.get_session_database(session_id)
+        
+        # Create session if none provided
+        if session_id is None:
+            session_id = session_manager.create_session()
+        
+        with MockhausExecutor(database_to_use) as executor:
             # Create sample data if using in-memory database
-            if request.database is None:
+            if database_to_use is None:
                 executor.create_sample_data()
             
             result = executor.execute_snowflake_sql(request.sql)
             execution_time = time.time() - start_time
+            
+            # Check if this was a USE DATABASE command that changed the current database
+            if result.success and executor._database_manager.current_database:
+                # Update session with new database path
+                new_db_path = executor._database_manager.get_current_database_path()
+                if new_db_path:
+                    session_manager.set_session_database(session_id, new_db_path)
             
             if result.success:
                 return QueryResponse(
@@ -49,7 +69,9 @@ async def execute_query(request: QueryRequest) -> Any:
                     data=result.data,
                     execution_time=execution_time,
                     translated_sql=result.translated_sql,
-                    message=None
+                    message=None,
+                    session_id=session_id,
+                    current_database=executor._database_manager.current_database
                 )
             else:
                 raise HTTPException(
@@ -57,7 +79,8 @@ async def execute_query(request: QueryRequest) -> Any:
                     detail={
                         "success": False,
                         "error": "SQL_EXECUTION_ERROR",
-                        "detail": result.error
+                        "detail": result.error,
+                        "session_id": session_id
                     }
                 )
                 
@@ -70,6 +93,7 @@ async def execute_query(request: QueryRequest) -> Any:
             detail={
                 "success": False,
                 "error": "INTERNAL_SERVER_ERROR",
-                "detail": f"Unexpected error: {str(e)}"
+                "detail": f"Unexpected error: {str(e)}",
+                "session_id": session_id if 'session_id' in locals() else None
             }
         )

@@ -13,6 +13,8 @@ class QueryResponse(BaseModel):
     execution_time: Optional[float] = Field(None, description="Query execution time in seconds")
     translated_sql: Optional[str] = Field(None, description="Translated DuckDB SQL")
     message: Optional[str] = Field(None, description="Success or info message")
+    session_id: Optional[str] = Field(None, description="Session ID for database context persistence")
+    current_database: Optional[str] = Field(None, description="Current database name")
 
     model_config = {
         "json_schema_extra": {

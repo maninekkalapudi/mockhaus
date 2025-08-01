@@ -5,6 +5,16 @@ import json
 import requests
 from typing import Optional
 
+# Enable readline for better input editing (backspace, arrow keys, history)
+try:
+    import readline
+    # Enable history and basic editing
+    readline.parse_and_bind("tab: complete")
+    readline.parse_and_bind("set editing-mode emacs")
+except ImportError:
+    # readline not available on this system
+    pass
+
 
 class MockhausClient:
     """HTTP client for Mockhaus server."""
@@ -18,6 +28,8 @@ class MockhausClient:
         """
         self.base_url = base_url
         self.session = requests.Session()
+        self.session_id: Optional[str] = None
+        self.current_database: Optional[str] = None
     
     def query(self, sql: str, database: Optional[str] = None) -> dict:
         """
@@ -30,11 +42,22 @@ class MockhausClient:
         Returns:
             Query result dictionary
         """
+        payload = {"sql": sql, "database": database}
+        if self.session_id:
+            payload["session_id"] = self.session_id
+            
         response = self.session.post(
             f"{self.base_url}/api/v1/query",
-            json={"sql": sql, "database": database}
+            json=payload
         )
-        return response.json()
+        result = response.json()
+        
+        # Update session info from response
+        if result.get("success") and "session_id" in result:
+            self.session_id = result["session_id"]
+            self.current_database = result.get("current_database")
+        
+        return result
     
     def health(self) -> dict:
         """
@@ -104,24 +127,114 @@ def print_help():
     """Print help information."""
     help_text = """
 Available commands:
-  <SQL>     Execute SQL query (e.g., SELECT * FROM sample_customers)
-  health    Check server health status
-  help      Show this help message
-  quit      Exit the REPL (or Ctrl+C)
+  <SQL>                Execute SQL query (any DDL, DML, or SELECT)
+  health               Check server health status
+  help                 Show this help message
+  quit                 Exit the REPL (or Ctrl+C)
+  
+Database Management (Snowflake-style):
+  CREATE DATABASE <name>    Create a new persistent database
+  USE DATABASE <name>       Switch to an existing database
+  USE <name>               Switch to an existing database (short form)
+  SHOW DATABASES           List all available databases
+  DROP DATABASE <name>     Delete a database
+  
+Multi-line queries:
+  - End with semicolon (;) for immediate execution
+  - Press Enter twice to execute without semicolon
+  - Use backspace, arrow keys, and command history
+  
+🎯 Quick Start with Persistent Tables:
+  1. CREATE DATABASE my_project;    -- Create a database file
+  2. USE DATABASE my_project;       -- Switch to it
+  3. CREATE TABLE ...;              -- Now tables will persist!
+  
+Sample data available:
+  sample_customers - Pre-loaded customer data for testing
   
 Examples:
-  SELECT * FROM sample_customers LIMIT 5
-  CREATE STAGE my_stage URL = 's3://bucket/path/'
-  COPY INTO customers FROM '@my_stage/data.csv'
+  -- Create and use a persistent database 
+  CREATE DATABASE analytics;
+  USE DATABASE analytics;
+  
+  -- Now create tables that will persist
+  CREATE TABLE employees (
+      id INTEGER PRIMARY KEY,
+      name VARCHAR(100),
+      department VARCHAR(50),
+      salary DECIMAL(10,2)
+  );
+  
+  -- Insert data (persists in database file)
+  INSERT INTO employees VALUES 
+      (1, 'Alice', 'Engineering', 95000),
+      (2, 'Bob', 'Marketing', 65000);
+  
+  -- Query your data (will work in future sessions)
+  SELECT * FROM employees WHERE department = 'Engineering';
+  
+  -- List all tables in current database
+  SELECT name FROM sqlite_master WHERE type='table';
+  
+  -- See all your databases
+  SHOW DATABASES;
 """
     print(help_text)
+
+
+def get_multi_line_input(prompt: str = "mockhaus> ", current_db: Optional[str] = None) -> str:
+    """
+    Get potentially multi-line SQL input.
+    Continues reading until a line ends with semicolon or user presses Enter twice.
+    """
+    lines = []
+    
+    # Create dynamic prompt with database context
+    if current_db:
+        base_prompt = f"mockhaus({current_db})> "
+    else:
+        base_prompt = prompt
+    
+    continuation_prompt = " " * (len(base_prompt) - 3) + "... "
+    
+    try:
+        while True:
+            if not lines:
+                line = input(base_prompt).strip()
+            else:
+                line = input(continuation_prompt).strip()
+            
+            if not line and lines:
+                # Empty line with existing content - execute
+                break
+                
+            if not line and not lines:
+                # Empty line with no content - continue
+                continue
+                
+            lines.append(line)
+            
+            # If line ends with semicolon, we're done
+            if line.endswith(';'):
+                break
+                
+    except EOFError:
+        # Ctrl+D pressed
+        if lines:
+            return ' '.join(lines)
+        else:
+            raise KeyboardInterrupt
+    
+    return ' '.join(lines)
 
 
 def main():
     """Interactive REPL for Mockhaus."""
     print("🏠 Mockhaus Interactive Client")
     print("Type SQL queries, 'health' for server status, 'help' for commands, or 'quit' to exit")
-    print("-" * 70)
+    print("💡 Multi-line queries: End with ';' or press Enter twice")
+    print("💡 Use backspace, arrow keys, and command history")
+    print("-" * 80)
     
     # Allow custom server URL via environment variable
     import os
@@ -142,7 +255,7 @@ def main():
     
     while True:
         try:
-            query = input("mockhaus> ").strip()
+            query = get_multi_line_input(current_db=client.current_database).strip()
             
             if not query:
                 continue
