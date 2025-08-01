@@ -53,6 +53,46 @@ def query(sql: Any, file: Any, database: Any, verbose: Any) -> None:
 
 
 @main.command()
+@click.option("--host", default="localhost", help="Host to bind server")
+@click.option("--port", default=8080, type=int, help="Port to bind server")
+@click.option("--database", "-d", default=None, help="Default database file")
+@click.option("--daemon", is_flag=True, help="Run as daemon")
+def serve(host: str, port: int, database: str, daemon: bool) -> None:
+    """Start Mockhaus HTTP server."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[red]Error: uvicorn not installed. Run: uv sync[/red]")
+        return
+
+    console.print(f"[green]Starting Mockhaus server at http://{host}:{port}[/green]")
+    
+    if database:
+        console.print(f"[dim]Default database: {database}[/dim]")
+    else:
+        console.print("[dim]Using in-memory database (with sample data)[/dim]")
+    
+    console.print(f"[dim]API documentation available at http://{host}:{port}/docs[/dim]")
+    console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
+    
+    # Set environment variable for default database if specified
+    if database:
+        import os
+        os.environ["MOCKHAUS_DEFAULT_DATABASE"] = database
+    
+    try:
+        uvicorn.run(
+            "mockhaus.server.app:app",
+            host=host,
+            port=port,
+            reload=not daemon,
+            log_level="info" if not daemon else "warning"
+        )
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Server stopped[/yellow]")
+
+
+@main.command()
 def sample() -> None:
     """Show sample queries that work with Mockhaus."""
 
