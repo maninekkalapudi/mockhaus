@@ -3,8 +3,8 @@
 from typing import Any
 
 import sqlglot
-from sqlglot import expressions as exp
-from ..sqlglot.dialects import CustomSnowflake, CustomDuckDB
+
+from ..sqlglot.dialects import CustomDuckDB, CustomSnowflake
 
 
 class SnowflakeToDuckDBTranslator:

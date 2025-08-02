@@ -1,14 +1,14 @@
 """Tests for custom DuckDB dialect."""
 
-import pytest
 import sys
 from pathlib import Path
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
-from mockhaus.sqlglot.dialects import CustomDuckDB
 import sqlglot
+
+from mockhaus.sqlglot.dialects import CustomDuckDB
 
 
 class TestCustomDuckDBDialect:
@@ -22,7 +22,7 @@ class TestCustomDuckDBDialect:
 
     def test_sysdate_transformation(self):
         """Test that SYSDATE is transformed to UTC timestamp in DuckDB."""
-        from mockhaus.sqlglot.dialects import CustomSnowflake, Sysdate
+        from mockhaus.sqlglot.dialects import CustomSnowflake
 
         # Parse with Snowflake dialect
         sql = "SELECT SYSDATE() AS current_time"

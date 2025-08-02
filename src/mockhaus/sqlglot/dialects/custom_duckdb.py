@@ -2,6 +2,7 @@
 
 from sqlglot import expressions as exp
 from sqlglot.dialects.duckdb import DuckDB
+
 from .expressions import Sysdate
 
 
@@ -19,7 +20,7 @@ class CustomDuckDBGenerator(DuckDB.Generator):
         in parentheses for proper SQL syntax.
         """
         # Create the AT TIME ZONE expression
-        utc_expr = f"CURRENT_TIMESTAMP AT TIME ZONE 'UTC'"
+        utc_expr = "CURRENT_TIMESTAMP AT TIME ZONE 'UTC'"
 
         # Check if we need parentheses based on context
         if self._needs_parentheses_for_sysdate(expression):
@@ -35,7 +36,7 @@ class CustomDuckDBGenerator(DuckDB.Generator):
         complex expressions like 'AT TIME ZONE' need to be wrapped.
         """
         # Walk up the parent chain to check context
-        current = expression
+        current: exp.Expression = expression
         depth = 0
         max_depth = 10  # Prevent infinite loops
 

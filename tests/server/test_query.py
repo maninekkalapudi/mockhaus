@@ -1,6 +1,5 @@
 """Tests for query execution endpoints."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 from mockhaus.server.app import app
@@ -15,10 +14,10 @@ def test_query_endpoint_select():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["success"] == True
+    assert data["success"]
     assert "data" in data
     assert "execution_time" in data
-    assert isinstance(data["execution_time"], (int, float))
+    assert isinstance(data["execution_time"], int | float)
     assert data["execution_time"] >= 0
 
 
@@ -29,7 +28,7 @@ def test_query_endpoint_with_sample_data():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["success"] == True
+    assert data["success"]
     assert data["data"] is not None
     assert len(data["data"]) > 0
 
@@ -41,7 +40,7 @@ def test_query_endpoint_ddl():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["success"] == True
+    assert data["success"]
 
 
 def test_query_endpoint_invalid_sql():
@@ -52,7 +51,7 @@ def test_query_endpoint_invalid_sql():
 
     data = response.json()
     assert "detail" in data
-    assert data["detail"]["success"] == False
+    assert not data["detail"]["success"]
     assert data["detail"]["error"] == "SQL_EXECUTION_ERROR"
 
 
@@ -83,4 +82,4 @@ def test_query_endpoint_with_database():
     assert response.status_code == 200
 
     data = response.json()
-    assert data["success"] == True
+    assert data["success"]

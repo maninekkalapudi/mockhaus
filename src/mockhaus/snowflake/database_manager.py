@@ -3,7 +3,6 @@
 import os
 import re
 from pathlib import Path
-from typing import Optional
 
 
 class SnowflakeDatabaseManager:
@@ -18,7 +17,7 @@ class SnowflakeDatabaseManager:
         """
         self.base_path = Path(base_path)
         self.base_path.mkdir(exist_ok=True)
-        self.current_database: Optional[str] = None
+        self.current_database: str | None = None
 
     def is_database_ddl(self, sql: str) -> bool:
         """
@@ -54,14 +53,13 @@ class SnowflakeDatabaseManager:
 
         if sql_upper.startswith("CREATE DATABASE"):
             return self._create_database(sql_clean)
-        elif sql_upper.startswith("DROP DATABASE"):
+        if sql_upper.startswith("DROP DATABASE"):
             return self._drop_database(sql_clean)
-        elif sql_upper.startswith("USE DATABASE") or sql_upper.startswith("USE "):
+        if sql_upper.startswith("USE DATABASE") or sql_upper.startswith("USE "):
             return self._use_database(sql_clean)
-        elif sql_upper.startswith("SHOW DATABASES"):
+        if sql_upper.startswith("SHOW DATABASES"):
             return self._show_databases()
-        else:
-            return {"success": False, "error": f"Unsupported database DDL: {sql}"}
+        return {"success": False, "error": f"Unsupported database DDL: {sql}"}
 
     def _create_database(self, sql: str) -> dict:
         """Handle CREATE DATABASE command."""
@@ -167,7 +165,7 @@ class SnowflakeDatabaseManager:
         except Exception as e:
             return {"success": False, "error": f"Failed to list databases: {str(e)}"}
 
-    def get_current_database_path(self) -> Optional[str]:
+    def get_current_database_path(self) -> str | None:
         """
         Get the file path of the current database.
 

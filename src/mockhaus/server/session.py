@@ -1,16 +1,15 @@
 """Session management for database context persistence."""
 
-from typing import Dict, Optional
 import uuid
-from pathlib import Path
+from typing import Any
 
 
 class SessionManager:
     """Manages client sessions and their database contexts."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize session manager."""
-        self._sessions: Dict[str, Dict[str, any]] = {}
+        self._sessions: dict[str, dict[str, Any]] = {}
 
     def create_session(self) -> str:
         """
@@ -26,7 +25,7 @@ class SessionManager:
         }
         return session_id
 
-    def get_session_database(self, session_id: Optional[str]) -> Optional[str]:
+    def get_session_database(self, session_id: str | None) -> str | None:
         """
         Get the current database for a session.
 
@@ -41,7 +40,7 @@ class SessionManager:
 
         return self._sessions[session_id].get("current_database")
 
-    def set_session_database(self, session_id: Optional[str], database_path: Optional[str]) -> None:
+    def set_session_database(self, session_id: str | None, database_path: str | None) -> None:
         """
         Set the current database for a session.
 

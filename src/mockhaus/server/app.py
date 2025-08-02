@@ -25,7 +25,7 @@ app.include_router(health.router, prefix="/api/v1")
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     """Root endpoint with basic server information."""
     return {
         "name": "Mockhaus Server",

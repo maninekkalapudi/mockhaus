@@ -17,7 +17,7 @@ def test_health_endpoint():
     assert data["status"] == "healthy"
     assert data["version"] == "0.3.0"
     assert "uptime" in data
-    assert isinstance(data["uptime"], (int, float))
+    assert isinstance(data["uptime"], int | float)
     assert data["uptime"] >= 0
 
 

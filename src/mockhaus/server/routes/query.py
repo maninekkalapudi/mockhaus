@@ -73,10 +73,9 @@ async def execute_query(request: QueryRequest) -> Any:
                     session_id=session_id,
                     current_database=executor._database_manager.current_database,
                 )
-            else:
-                raise HTTPException(
-                    status_code=400, detail={"success": False, "error": "SQL_EXECUTION_ERROR", "detail": result.error, "session_id": session_id}
-                )
+            raise HTTPException(
+                status_code=400, detail={"success": False, "error": "SQL_EXECUTION_ERROR", "detail": result.error, "session_id": session_id}
+            )
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is
@@ -90,4 +89,4 @@ async def execute_query(request: QueryRequest) -> Any:
                 "detail": f"Unexpected error: {str(e)}",
                 "session_id": session_id if "session_id" in locals() else None,
             },
-        )
+        ) from e

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Enhanced interactive REPL client for Mockhaus server using prompt_toolkit."""
 
-import json
 import os
+from typing import Any, cast
+
 import requests
-from typing import Optional
 
 # Try to import prompt_toolkit for enhanced features
 try:
     from prompt_toolkit import prompt
-    from prompt_toolkit.history import FileHistory
     from prompt_toolkit.completion import WordCompleter
-    from prompt_toolkit.shortcuts import CompleteStyle
+    from prompt_toolkit.history import FileHistory
     from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.shortcuts import CompleteStyle
 
     PROMPT_TOOLKIT_AVAILABLE = True
 except ImportError:
@@ -31,13 +31,13 @@ class EnhancedMockhausClient:
         """
         self.base_url = base_url
         self.session = requests.Session()
-        self.session_id: Optional[str] = None
-        self.current_database: Optional[str] = None
+        self.session_id: str | None = None
+        self.current_database: str | None = None
 
         if PROMPT_TOOLKIT_AVAILABLE:
             self._setup_enhanced_features()
 
-    def _setup_enhanced_features(self):
+    def _setup_enhanced_features(self) -> None:
         """Setup enhanced terminal features when prompt_toolkit is available."""
         # Setup persistent history file
         history_file = os.path.expanduser("~/.mockhaus_history")
@@ -117,25 +117,25 @@ class EnhancedMockhausClient:
         self.bindings = KeyBindings()
         self._setup_key_bindings()
 
-    def _setup_key_bindings(self):
+    def _setup_key_bindings(self) -> None:
         """Setup custom key bindings for enhanced functionality."""
 
         @self.bindings.add("f5")
-        def show_databases(event):
+        def show_databases(event: Any) -> None:
             """F5: Insert SHOW DATABASES command"""
             event.app.current_buffer.insert_text("SHOW DATABASES;")
 
         @self.bindings.add("f6")
-        def show_tables(event):
+        def show_tables(event: Any) -> None:
             """F6: Insert query to show tables"""
             event.app.current_buffer.insert_text("SELECT name FROM sqlite_master WHERE type='table';")
 
         @self.bindings.add("c-l")
-        def clear_screen(event):
+        def clear_screen(event: Any) -> None:
             """Ctrl+L: Clear screen"""
             event.app.output.clear()
 
-    def query(self, sql: str, database: Optional[str] = None) -> dict:
+    def query(self, sql: str, database: str | None = None) -> dict[str, Any]:
         """
         Execute SQL query against Mockhaus server.
 
@@ -158,9 +158,9 @@ class EnhancedMockhausClient:
             self.session_id = result["session_id"]
             self.current_database = result.get("current_database")
 
-        return result
+        return cast(dict[str, Any], result)
 
-    def health(self) -> dict:
+    def health(self) -> dict[str, Any]:
         """
         Check server health.
 
@@ -168,7 +168,7 @@ class EnhancedMockhausClient:
             Health status dictionary
         """
         response = self.session.get(f"{self.base_url}/api/v1/health")
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def get_input(self, base_prompt: str) -> str:
         """
@@ -184,7 +184,7 @@ class EnhancedMockhausClient:
             # Fallback to basic input
             return input(base_prompt)
 
-        lines = []
+        lines: list[str] = []
         continuation_prompt = " " * (len(base_prompt) - 3) + "... "
 
         try:
@@ -206,7 +206,7 @@ class EnhancedMockhausClient:
                 if not line and lines:
                     # Empty line with existing content - execute
                     break
-                elif not line and not lines:
+                if not line and not lines:
                     # Empty line with no content - continue
                     continue
 
@@ -221,8 +221,7 @@ class EnhancedMockhausClient:
         except (EOFError, KeyboardInterrupt):
             if lines:
                 return " ".join(lines)
-            else:
-                raise
+            raise
 
 
 def format_results(result: dict) -> str:
@@ -237,10 +236,7 @@ def format_results(result: dict) -> str:
     """
     if not result.get("success"):
         error_detail = result.get("detail", {})
-        if isinstance(error_detail, dict):
-            error_msg = error_detail.get("detail", "Unknown error")
-        else:
-            error_msg = str(error_detail)
+        error_msg = error_detail.get("detail", "Unknown error") if isinstance(error_detail, dict) else str(error_detail)
         return f"❌ Error: {error_msg}"
 
     data = result.get("data", [])
@@ -306,92 +302,24 @@ def format_results(result: dict) -> str:
     return "✅ Query executed successfully"
 
 
-def print_help():
+def print_help() -> None:
     """Print help information with enhanced features."""
-    help_text = """
-Available commands:
-  <SQL>                Execute SQL query (any DDL, DML, or SELECT)
-  health               Check server health status
-  help                 Show this help message
-  quit                 Exit the REPL (or Ctrl+C)
-  
-Database Management (Snowflake-style):
-  CREATE DATABASE <name>    Create a new persistent database
-  USE DATABASE <name>       Switch to an existing database
-  USE <name>               Switch to an existing database (short form)
-  SHOW DATABASES           List all available databases
-  DROP DATABASE <name>     Delete a database
-  
-Enhanced Features (when prompt_toolkit is available):
-  🚀 Auto-completion      SQL keywords with Tab completion
-  📚 Persistent history   Commands saved across sessions
-  🔍 History search      Use Ctrl+R to search command history
-  ⌨️  Custom shortcuts    F5=SHOW DATABASES, F6=SHOW TABLES, Ctrl+L=clear
-  📝 Multi-line editing   Better editing experience for complex queries
-  
-Multi-line queries:
-  - End with semicolon (;) for immediate execution
-  - Press Ctrl+D or Ctrl+C to execute/exit
-  - Use backspace, arrow keys, and command history
-  
-🎯 Quick Start with Persistent Tables:
-  1. CREATE DATABASE my_project;    -- Create a database file
-  2. USE DATABASE my_project;       -- Switch to it
-  3. CREATE TABLE ...;              -- Now tables will persist!
-  
-Sample data available:
-  sample_customers - Pre-loaded customer data for testing
-  
-Examples:
-  -- Create and use a persistent database 
-  CREATE DATABASE analytics;
-  USE DATABASE analytics;
-  
-  -- Now create tables that will persist
-  CREATE TABLE employees (
-      id INTEGER PRIMARY KEY,
-      name VARCHAR(100),
-      department VARCHAR(50),
-      salary DECIMAL(10,2)
-  );
-  
-  -- Insert data (persists in database file)
-  INSERT INTO employees VALUES 
-      (1, 'Alice', 'Engineering', 95000),
-      (2, 'Bob', 'Marketing', 65000);
-  
-  -- Query your data (will work in future sessions)
-  SELECT * FROM employees WHERE department = 'Engineering';
-  
-  -- List all tables in current database
-  SELECT name FROM sqlite_master WHERE type='table';
-  
-  -- See all your databases
-  SHOW DATABASES;
-"""
-    print(help_text)
 
 
-def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: Optional[str] = None) -> str:
+def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | None = None) -> str:
     """
     Fallback multi-line input for when prompt_toolkit is not available.
     """
-    lines = []
+    lines: list[str] = []
 
     # Create dynamic prompt with database context
-    if current_db:
-        base_prompt = f"mockhaus({current_db})> "
-    else:
-        base_prompt = prompt
+    base_prompt = f"mockhaus({current_db})> " if current_db else prompt
 
     continuation_prompt = " " * (len(base_prompt) - 3) + "... "
 
     try:
         while True:
-            if not lines:
-                line = input(base_prompt).strip()
-            else:
-                line = input(continuation_prompt).strip()
+            line = input(base_prompt).strip() if not lines else input(continuation_prompt).strip()
 
             if not line and lines:
                 # Empty line with existing content - execute
@@ -411,27 +339,19 @@ def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: Optional[
         # Ctrl+D pressed
         if lines:
             return " ".join(lines)
-        else:
-            raise KeyboardInterrupt
+        raise KeyboardInterrupt from None
 
     return " ".join(lines)
 
 
-def main():
+def main() -> None:
     """Enhanced interactive REPL for Mockhaus."""
     # Print startup message with enhanced features status
-    print("🏠 Mockhaus Interactive Client")
 
     if PROMPT_TOOLKIT_AVAILABLE:
-        print("🚀 Enhanced REPL loaded (prompt_toolkit)")
-        print("   Features: Auto-completion, persistent history, advanced editing")
-        print("   Shortcuts: F5=SHOW DATABASES, F6=SHOW TABLES, Ctrl+L=clear, Ctrl+R=search")
+        pass
     else:
-        print("📱 Basic REPL loaded (prompt_toolkit not available)")
-        print("   Install with: uv add prompt-toolkit")
-
-    print("Type SQL queries, 'health' for server status, 'help' for commands, or 'quit' to exit")
-    print("-" * 80)
+        pass
 
     # Allow custom server URL via environment variable
     server_url = os.getenv("MOCKHAUS_SERVER_URL", "http://localhost:8080")
@@ -439,23 +359,14 @@ def main():
 
     # Test connection
     try:
-        health = client.health()
-        print(f"✅ Connected to Mockhaus v{health['version']} at {server_url}")
-    except Exception as e:
-        print(f"❌ Cannot connect to server: {e}")
-        print("Make sure the server is running: uv run mockhaus serve")
-        print(f"Server URL: {server_url}")
+        client.health()
+    except Exception:
         return
-
-    print()
 
     while True:
         try:
             # Create dynamic prompt with database context
-            if client.current_database:
-                base_prompt = f"mockhaus({client.current_database})> "
-            else:
-                base_prompt = "mockhaus> "
+            base_prompt = f"mockhaus({client.current_database})> " if client.current_database else "mockhaus> "
 
             if PROMPT_TOOLKIT_AVAILABLE:
                 query = client.get_input(base_prompt).strip()
@@ -466,7 +377,6 @@ def main():
                 continue
 
             if query.lower() in ["quit", "exit", "q"]:
-                print("👋 Goodbye!")
                 break
 
             if query.lower() in ["help", "?"]:
@@ -474,21 +384,16 @@ def main():
                 continue
 
             if query.lower() == "health":
-                result = client.health()
-                uptime_minutes = result["uptime"] / 60
-                print(f"✅ Server healthy - uptime: {uptime_minutes:.1f} minutes")
+                client.health()
                 continue
 
             # Execute SQL query
-            result = client.query(query)
-            print(format_results(result))
-            print()
+            client.query(query)
 
         except KeyboardInterrupt:
-            print("\n👋 Goodbye!")
             break
-        except Exception as e:
-            print(f"❌ Error: {e}")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

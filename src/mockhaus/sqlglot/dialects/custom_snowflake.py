@@ -1,11 +1,14 @@
 """Custom Snowflake dialect extending SQLGlot's Snowflake dialect."""
 
+from typing import Any
+
 from sqlglot import expressions as exp
 from sqlglot.dialects.snowflake import Snowflake
+
 from .expressions import Sysdate
 
 
-def _parse_sysdate(args) -> exp.Expression:
+def _parse_sysdate(_: Any) -> exp.Expression:
     """
     Parse SYSDATE() function.
 
@@ -28,7 +31,7 @@ class CustomSnowflakeParser(Snowflake.Parser):
 class CustomSnowflakeGenerator(Snowflake.Generator):
     """Extended Snowflake SQL generator with custom function support."""
 
-    def sysdate_sql(self, expression: Sysdate) -> str:
+    def sysdate_sql(self, _: Sysdate) -> str:
         """Generate SQL for SYSDATE() function in Snowflake dialect."""
         return "SYSDATE()"
 

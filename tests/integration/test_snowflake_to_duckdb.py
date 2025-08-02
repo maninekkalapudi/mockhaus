@@ -1,6 +1,5 @@
 """End-to-end integration tests for Snowflake to DuckDB translation."""
 
-import pytest
 import sys
 from pathlib import Path
 
@@ -39,15 +38,15 @@ class TestSnowflakeToDuckDBIntegration:
         """Test translation of complex queries with multiple features."""
         snowflake_sql = """
         WITH recent_orders AS (
-            SELECT 
+            SELECT
                 customer_id,
                 order_date,
                 total_amount,
                 SYSDATE() AS query_time
-            FROM orders 
+            FROM orders
             WHERE order_date >= SYSDATE() - INTERVAL '30 days'
         )
-        SELECT 
+        SELECT
             customer_id,
             COUNT(*) as order_count,
             SUM(total_amount) as total_spent,
@@ -72,11 +71,11 @@ class TestSnowflakeToDuckDBIntegration:
     def test_translation_info_comprehensive(self):
         """Test the translation info for complex queries."""
         snowflake_sql = """
-        SELECT 
+        SELECT
             user_id,
             login_time,
             SYSDATE() - login_time AS time_since_login
-        FROM user_sessions 
+        FROM user_sessions
         WHERE login_time >= SYSDATE() - 7
         """
 

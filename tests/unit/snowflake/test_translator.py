@@ -1,15 +1,17 @@
 """Tests for SYSDATE() function translation in custom Snowflake dialect."""
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
+import sqlglot
+
 from mockhaus.snowflake.translator import SnowflakeToDuckDBTranslator
 from mockhaus.sqlglot.dialects import CustomSnowflake, Sysdate
-import sqlglot
 
 
 class TestSysdateTranslation:
@@ -69,11 +71,11 @@ class TestSysdateTranslation:
     def test_multiple_sysdate_calls(self):
         """Test multiple SYSDATE() calls in one query."""
         sql = """
-        SELECT 
+        SELECT
             SYSDATE() AS query_time,
             user_id,
             created_at
-        FROM events 
+        FROM events
         WHERE created_at >= SYSDATE() - INTERVAL '24 hours'
           AND updated_at < SYSDATE()
         """
@@ -151,8 +153,8 @@ class TestSysdateTranslation:
         """Test SYSDATE() in Common Table Expression (CTE)."""
         sql = """
         WITH recent_events AS (
-            SELECT * 
-            FROM events 
+            SELECT *
+            FROM events
             WHERE created_at >= SYSDATE() - INTERVAL '7 days'
         )
         SELECT COUNT(*), SYSDATE() AS report_time
@@ -166,9 +168,9 @@ class TestSysdateTranslation:
     def test_sysdate_in_subquery(self):
         """Test SYSDATE() in subquery."""
         sql = """
-        SELECT user_id, 
-               (SELECT COUNT(*) 
-                FROM user_actions 
+        SELECT user_id,
+               (SELECT COUNT(*)
+                FROM user_actions
                 WHERE action_time >= SYSDATE() - 30) AS recent_actions
         FROM users
         """
@@ -189,7 +191,7 @@ class TestSysdateTranslation:
     def test_performance_with_large_query(self):
         """Test performance with a query containing many SYSDATE() calls."""
         # Create a query with multiple SYSDATE() calls
-        sysdate_calls = ["SYSDATE() AS time_{}".format(i) for i in range(10)]
+        sysdate_calls = [f"SYSDATE() AS time_{i}" for i in range(10)]
         sql = f"SELECT {', '.join(sysdate_calls)} FROM users"
 
         result = self.translator.translate(sql)

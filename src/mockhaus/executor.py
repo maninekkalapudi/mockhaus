@@ -125,14 +125,13 @@ class MockhausExecutor:
                         original_sql=snowflake_sql,
                         translated_sql="-- Database DDL (no translation needed)",
                     )
-                else:
-                    return QueryResult(
-                        success=False,
-                        error=result["error"],
-                        execution_time_ms=execution_time,
-                        original_sql=snowflake_sql,
-                        translated_sql="",
-                    )
+                return QueryResult(
+                    success=False,
+                    error=result["error"],
+                    execution_time_ms=execution_time,
+                    original_sql=snowflake_sql,
+                    translated_sql="",
+                )
 
             # Ensure we're connected
             self.connect()
