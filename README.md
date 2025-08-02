@@ -228,6 +228,43 @@ mockhaus> .tables
 mockhaus> .schema sample_customers
 ```
 
+Example of creating a database and tables:
+```sql
+mockhaus> CREATE DATABASE analytics;
+Database 'analytics' created successfully
+
+mockhaus> USE DATABASE analytics;
+Switched to database: analytics
+
+mockhaus> CREATE TABLE users (
+       >   user_id INTEGER PRIMARY KEY,
+       >   username VARCHAR(50),
+       >   email VARCHAR(100),
+       >   created_at TIMESTAMP
+       > );
+Table 'users' created successfully
+
+mockhaus> CREATE TABLE events (
+       >   event_id INTEGER PRIMARY KEY,
+       >   user_id INTEGER,
+       >   event_type VARCHAR(50),
+       >   event_time TIMESTAMP
+       > );
+Table 'events' created successfully
+
+mockhaus> .tables
+users
+events
+
+mockhaus> .schema users
+CREATE TABLE users (
+  user_id INTEGER PRIMARY KEY,
+  username VARCHAR(50),
+  email VARCHAR(100),
+  created_at TIMESTAMP
+);
+```
+
 ## Architecture
 
 ```
