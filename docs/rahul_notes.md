@@ -1,8 +1,14 @@
 - query logging
+  -- privacy/security not yet implemented
+-- deployment architecture redo
+    --server with/without persistent history
+    --in-memory with in-memory history
+- full support for copy-data
+-- dockerize
+-- utility commands. like show history etc.
 - full support for all select queries, inserts, merges etc.
-- logging all queries for debugging and analysis
 -- dbt integration (future future)
--- in-memory mode?
+-- in-memory mode? what does this mean? for whom? 
 -- warehouses
 -- shares
 -- listings

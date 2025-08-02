@@ -1,0 +1,20 @@
+{
+  "default_database": null,
+  "history": {
+    "enabled": true,
+    "db_path": null,
+    "retention_days": 30,
+    "max_size_mb": 1000,
+    "redact_literals": false,
+    "exclude_patterns": [
+      ".*password.*",
+      ".*secret.*"
+    ],
+    "batch_size": 100,
+    "async_write": true
+  },
+  "server_host": "localhost",
+  "server_port": 8080,
+  "use_ast_parser": true,
+  "enable_query_cache": false
+}
