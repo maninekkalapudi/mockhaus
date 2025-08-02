@@ -32,5 +32,5 @@ async def root():
         "version": "0.3.0",
         "description": "Snowflake proxy with DuckDB backend",
         "docs_url": "/docs",
-        "health_url": "/api/v1/health"
+        "health_url": "/api/v1/health",
     }

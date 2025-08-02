@@ -301,8 +301,10 @@ class TestASTParser(unittest.TestCase):
 
     def test_parse_copy_into_complex_inline_format(self) -> None:
         """Test parsing COPY INTO with complex inline format."""
-        sql = ("COPY INTO table FROM '@stage/file.csv' FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = '|' "
-               "FIELD_OPTIONALLY_ENCLOSED_BY = '\"' RECORD_DELIMITER = '\\r\\n')")
+        sql = (
+            "COPY INTO table FROM '@stage/file.csv' FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = '|' "
+            "FIELD_OPTIONALLY_ENCLOSED_BY = '\"' RECORD_DELIMITER = '\\r\\n')"
+        )
         result = self.parser.parse_copy_into(sql)
 
         assert result["error"] is None

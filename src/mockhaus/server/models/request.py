@@ -15,19 +15,9 @@ class QueryRequest(BaseModel):
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {
-                    "sql": "SELECT * FROM sample_customers LIMIT 10",
-                    "database": None,
-                    "session_id": None
-                },
-                {
-                    "sql": "CREATE DATABASE my_project",
-                    "session_id": "abc123-def456"
-                },
-                {
-                    "sql": "CREATE TABLE employees (id INT, name VARCHAR(100))",
-                    "session_id": "abc123-def456"
-                }
+                {"sql": "SELECT * FROM sample_customers LIMIT 10", "database": None, "session_id": None},
+                {"sql": "CREATE DATABASE my_project", "session_id": "abc123-def456"},
+                {"sql": "CREATE TABLE employees (id INT, name VARCHAR(100))", "session_id": "abc123-def456"},
             ]
         }
     }

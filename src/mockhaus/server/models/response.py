@@ -23,11 +23,11 @@ class QueryResponse(BaseModel):
                     "success": True,
                     "data": [
                         {"customer_id": 1, "customer_name": "Alice", "account_balance": 1500.0},
-                        {"customer_id": 2, "customer_name": "Bob", "account_balance": 2300.0}
+                        {"customer_id": 2, "customer_name": "Bob", "account_balance": 2300.0},
                     ],
                     "execution_time": 0.123,
                     "translated_sql": "SELECT customer_id, customer_name, account_balance FROM sample_customers",
-                    "message": None
+                    "message": None,
                 }
             ]
         }
@@ -41,17 +41,7 @@ class HealthResponse(BaseModel):
     version: str = Field(..., description="Mockhaus version")
     uptime: Optional[float] = Field(None, description="Server uptime in seconds")
 
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "status": "healthy",
-                    "version": "0.3.0",
-                    "uptime": 3600.5
-                }
-            ]
-        }
-    }
+    model_config = {"json_schema_extra": {"examples": [{"status": "healthy", "version": "0.3.0", "uptime": 3600.5}]}}
 
 
 class ErrorResponse(BaseModel):
@@ -62,13 +52,5 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = Field(None, description="Detailed error message")
 
     model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {
-                    "success": False,
-                    "error": "SQL_EXECUTION_ERROR",
-                    "detail": "Table 'nonexistent_table' not found"
-                }
-            ]
-        }
+        "json_schema_extra": {"examples": [{"success": False, "error": "SQL_EXECUTION_ERROR", "detail": "Table 'nonexistent_table' not found"}]}
     }

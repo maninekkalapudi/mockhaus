@@ -47,6 +47,9 @@ uv run mockhaus query "SELECT * FROM sample_customers WHERE account_balance > 10
 uv run mockhaus setup -d my_data.db
 uv run mockhaus query -d my_data.db "SELECT COUNT(*) FROM sample_customers"
 
+# Start the HTTP server
+uv run mockhaus serve
+
 # Run tests
 uv run pytest -v
 ```
@@ -179,14 +182,14 @@ uv run ruff check src/ tests/
 ### Starting the HTTP Server
 
 ```bash
-# Start the server on default port 8000
-uv run mockhaus server
+# Start the server on default port 8080
+uv run mockhaus serve
 
 # Start on a custom port
-uv run mockhaus server --port 9000
+uv run mockhaus serve --port 9000
 
 # Use a persistent database
-uv run mockhaus server -d my_data.db --port 8080
+uv run mockhaus serve -d my_data.db --port 8080
 ```
 
 The server provides a REST API for executing Snowflake queries:
@@ -203,66 +206,63 @@ curl http://localhost:8000/health
 
 ### Interactive REPL
 
-```bash
-# Start the REPL with in-memory database
-uv run mockhaus repl
+The REPL is a client that connects to the Mockhaus HTTP server. You need to run both the server and client:
 
-# Start with a persistent database
-uv run mockhaus repl -d my_data.db
+```bash
+# Step 1: Start the Mockhaus server (in one terminal)
+uv run mockhaus serve
+
+# Step 2: Run the enhanced REPL client (in another terminal)
+uv run python -m mockhaus.repl.enhanced_repl
+
+# Or use the basic REPL if you prefer
+uv run python -m mockhaus.repl.repl
+```
+
+You can also configure the server connection:
+```bash
+# Start server on a custom port
+uv run mockhaus serve --port 9000
+
+# Connect REPL to custom server URL
+export MOCKHAUS_SERVER_URL=http://localhost:9000
+uv run python -m mockhaus.repl.enhanced_repl
 ```
 
 REPL features:
-- Syntax highlighting for SQL queries
-- Multi-line query support (use `;` to execute)
-- Command history with arrow keys
-- `.help` - Show available commands
-- `.tables` - List all tables
-- `.schema <table>` - Show table schema
-- `.quit` or Ctrl+D - Exit the REPL
+- Interactive SQL execution against the Mockhaus server
+- Health monitoring with `health` command
+- Formatted tabular output for query results
+- Clear error messages for failed queries
+- Connection testing on startup
+
+Available commands:
+- Any SQL query - Execute against the Mockhaus server
+- `health` - Check server health and uptime
+- `help` - Show available commands
+- `quit` / `exit` / `q` - Exit the REPL
+- `Ctrl+C` - Exit the REPL
 
 Example REPL session:
-```sql
-mockhaus> SELECT * FROM sample_customers WHERE account_balance > 1000;
-mockhaus> CREATE STAGE my_stage URL = 's3://bucket/path/';
-mockhaus> .tables
-mockhaus> .schema sample_customers
 ```
+🏠 Mockhaus Interactive Client
+Type SQL queries, 'health' for server status, 'help' for commands, or 'quit' to exit
+----------------------------------------------------------------------
+✅ Connected to Mockhaus v0.3.0 at http://localhost:8080
 
-Example of creating a database and tables:
-```sql
-mockhaus> CREATE DATABASE analytics;
-Database 'analytics' created successfully
+mockhaus> SELECT * FROM sample_customers WHERE account_balance > 1000
+customer_id | customer_name | account_balance | signup_date |    is_active
+---------------------------------------------------------------------------
+          1 |         Alice |          1500.0 |  2023-01-15 |         True
+          2 |           Bob |          2300.0 |  2023-02-20 |         True
 
-mockhaus> USE DATABASE analytics;
-Switched to database: analytics
+✅ 2 rows in 0.045s
 
-mockhaus> CREATE TABLE users (
-       >   user_id INTEGER PRIMARY KEY,
-       >   username VARCHAR(50),
-       >   email VARCHAR(100),
-       >   created_at TIMESTAMP
-       > );
-Table 'users' created successfully
+mockhaus> CREATE STAGE my_stage URL = 's3://bucket/path/'
+✅ Query executed successfully (no results)
 
-mockhaus> CREATE TABLE events (
-       >   event_id INTEGER PRIMARY KEY,
-       >   user_id INTEGER,
-       >   event_type VARCHAR(50),
-       >   event_time TIMESTAMP
-       > );
-Table 'events' created successfully
-
-mockhaus> .tables
-users
-events
-
-mockhaus> .schema users
-CREATE TABLE users (
-  user_id INTEGER PRIMARY KEY,
-  username VARCHAR(50),
-  email VARCHAR(100),
-  created_at TIMESTAMP
-);
+mockhaus> health
+✅ Server healthy - uptime: 5.2 minutes
 ```
 
 ## Architecture

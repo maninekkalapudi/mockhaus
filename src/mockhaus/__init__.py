@@ -3,6 +3,7 @@
 __version__ = "0.1.0"
 
 from .executor import MockhausExecutor, QueryResult
+from .repl import MockhausClient, repl_main
 from .snowflake import (
     CopyIntoTranslator,
     FileFormat,
@@ -18,6 +19,8 @@ __all__ = [
     "translate_snowflake_to_duckdb",
     "MockhausExecutor",
     "QueryResult",
+    "MockhausClient",
+    "repl_main",
     "MockStageManager",
     "Stage",
     "MockFileFormatManager",

@@ -66,28 +66,23 @@ def serve(host: str, port: int, database: str, daemon: bool) -> None:
         return
 
     console.print(f"[green]Starting Mockhaus server at http://{host}:{port}[/green]")
-    
+
     if database:
         console.print(f"[dim]Default database: {database}[/dim]")
     else:
         console.print("[dim]Using in-memory database (with sample data)[/dim]")
-    
+
     console.print(f"[dim]API documentation available at http://{host}:{port}/docs[/dim]")
     console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
-    
+
     # Set environment variable for default database if specified
     if database:
         import os
+
         os.environ["MOCKHAUS_DEFAULT_DATABASE"] = database
-    
+
     try:
-        uvicorn.run(
-            "mockhaus.server.app:app",
-            host=host,
-            port=port,
-            reload=not daemon,
-            log_level="info" if not daemon else "warning"
-        )
+        uvicorn.run("mockhaus.server.app:app", host=host, port=port, reload=not daemon, log_level="info" if not daemon else "warning")
     except KeyboardInterrupt:
         console.print("\n[yellow]Server stopped[/yellow]")
 
@@ -132,12 +127,13 @@ def sample() -> None:
 def repl() -> None:
     """Start interactive REPL client."""
     try:
-        # Import the client module which will automatically select the best REPL
-        from client import repl_main
+        # Import the repl module which will automatically select the best REPL
+        from .repl import repl_main
+
         repl_main()
     except ImportError:
-        console.print("[red]Error: Client module not found. Make sure you're running from the project root.[/red]")
-        console.print("[dim]Try: python -m client.enhanced_repl[/dim]")
+        console.print("[red]Error: REPL module not found. Make sure you're running from the project root.[/red]")
+        console.print("[dim]Try: python -m mockhaus.repl.enhanced_repl[/dim]")
     except KeyboardInterrupt:
         console.print("\n[yellow]REPL interrupted[/yellow]")
 

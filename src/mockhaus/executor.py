@@ -95,7 +95,7 @@ class MockhausExecutor:
             if self._database_manager.is_database_ddl(snowflake_sql):
                 result = self._database_manager.execute_database_ddl(snowflake_sql)
                 execution_time = (time.time() - start_time) * 1000
-                
+
                 if result["success"]:
                     # For USE DATABASE commands, switch to the new database
                     if "database_path" in result:
@@ -103,7 +103,7 @@ class MockhausExecutor:
                         # Reconnect to the new database
                         self.disconnect()
                         self.connect()
-                    
+
                     # Format response based on command type
                     data = None
                     columns = None
@@ -115,7 +115,7 @@ class MockhausExecutor:
                         # CREATE/DROP/USE DATABASE
                         data = [{"message": result["message"]}]
                         columns = ["message"]
-                    
+
                     return QueryResult(
                         success=True,
                         data=data,

@@ -17,13 +17,9 @@ _start_time = time.time()
 async def health_check() -> Any:
     """
     Health check endpoint.
-    
+
     Returns the server status, version, and uptime.
     """
     uptime = time.time() - _start_time
-    
-    return HealthResponse(
-        status="healthy",
-        version="0.3.0",
-        uptime=uptime
-    )
+
+    return HealthResponse(status="healthy", version="0.3.0", uptime=uptime)

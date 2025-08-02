@@ -89,7 +89,7 @@ The client provides clear error messages for:
 The `MockhausClient` class can be imported and used in other Python scripts:
 
 ```python
-from client.repl import MockhausClient
+from mockhaus.repl import MockhausClient
 
 client = MockhausClient("http://localhost:8080")
 result = client.query("SELECT COUNT(*) FROM sample_customers")
