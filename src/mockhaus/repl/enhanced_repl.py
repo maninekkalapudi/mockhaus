@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Enhanced interactive REPL client for Mockhaus server using prompt_toolkit."""
+# ruff: noqa: T201
 
 import os
 from typing import Any, cast
@@ -304,6 +305,32 @@ def format_results(result: dict) -> str:
 
 def print_help() -> None:
     """Print help information with enhanced features."""
+    print("📖 Mockhaus REPL Help")
+    print("=" * 30)
+    print()
+    print("Commands:")
+    print("  help, ?          - Show this help")
+    print("  health           - Check server health")
+    print("  quit, exit, q    - Exit REPL")
+    print()
+    print("SQL Examples:")
+    print("  SHOW DATABASES;")
+    print("  CREATE DATABASE test.db;")
+    print("  USE test.db;")
+    print("  CREATE TABLE users (id INT, name VARCHAR(50));")
+    print("  INSERT INTO users VALUES (1, 'Alice');")
+    print("  SELECT * FROM users;")
+    print()
+    if PROMPT_TOOLKIT_AVAILABLE:
+        print("Enhanced Features:")
+        print("  - Auto-completion (Tab)")
+        print("  - Command history (Up/Down arrows)")
+        print("  - F5: Insert 'SHOW DATABASES;'")
+        print("  - F6: Insert table listing query")
+        print("  - Ctrl+L: Clear screen")
+        print()
+    print("Multi-line queries: End with semicolon (;) or empty line to execute")
+    print()
 
 
 def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | None = None) -> str:
@@ -347,11 +374,17 @@ def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | Non
 def main() -> None:
     """Enhanced interactive REPL for Mockhaus."""
     # Print startup message with enhanced features status
+    print("🏠 Mockhaus Interactive REPL")
+    print("=" * 40)
 
     if PROMPT_TOOLKIT_AVAILABLE:
-        pass
+        print("✅ Enhanced mode (with auto-completion and history)")
+        print("   F5: Show databases, F6: Show tables, Ctrl+L: Clear screen")
     else:
-        pass
+        print("⚠️  Basic mode (prompt_toolkit not available)")
+
+    print("   Type 'help' for commands, 'quit' or Ctrl+C to exit")
+    print()
 
     # Allow custom server URL via environment variable
     server_url = os.getenv("MOCKHAUS_SERVER_URL", "http://localhost:8080")
@@ -359,8 +392,13 @@ def main() -> None:
 
     # Test connection
     try:
-        client.health()
-    except Exception:
+        health_result = client.health()
+        print(f"🚀 Connected to Mockhaus server at {server_url}")
+        print(f"   Server status: {health_result}")
+    except Exception as e:
+        print(f"❌ Cannot connect to Mockhaus server at {server_url}")
+        print(f"   Error: {e}")
+        print("   Please make sure the server is running with: python -m mockhaus.server")
         return
 
     while True:
@@ -373,7 +411,7 @@ def main() -> None:
             else:
                 query = get_multi_line_input_basic(current_db=client.current_database).strip()
 
-            if not query:
+            if not query or query.strip() == "":
                 continue
 
             if query.lower() in ["quit", "exit", "q"]:
@@ -384,16 +422,23 @@ def main() -> None:
                 continue
 
             if query.lower() == "health":
-                client.health()
+                health_result = client.health()
+                print(f"✅ Server health: {health_result}")
                 continue
 
             # Execute SQL query
-            client.query(query)
+            result = client.query(query)
+            print(format_results(result))
 
         except KeyboardInterrupt:
+            print("\n👋 Goodbye!")
             break
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"❌ Unexpected error: {e}")
+            import traceback
+
+            traceback.print_exc()
+            continue
 
 
 if __name__ == "__main__":

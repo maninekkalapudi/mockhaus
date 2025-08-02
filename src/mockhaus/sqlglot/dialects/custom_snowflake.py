@@ -5,7 +5,7 @@ from typing import Any
 from sqlglot import expressions as exp
 from sqlglot.dialects.snowflake import Snowflake
 
-from .expressions import Sysdate
+from .expressions import IdentifierFunc, Sysdate
 
 
 def _parse_sysdate(_: Any) -> exp.Expression:
@@ -18,6 +18,21 @@ def _parse_sysdate(_: Any) -> exp.Expression:
     return Sysdate()
 
 
+def _build_identifier_func(args: list) -> exp.Expression:
+    """
+    Build IDENTIFIER() function expression.
+
+    Args:
+        args: List of arguments passed to IDENTIFIER()
+
+    Returns:
+        IdentifierFunc expression with the argument
+    """
+    from sqlglot.helper import seq_get
+
+    return IdentifierFunc(this=seq_get(args, 0))
+
+
 class CustomSnowflakeParser(Snowflake.Parser):
     """Extended Snowflake parser with custom functions."""
 
@@ -25,6 +40,7 @@ class CustomSnowflakeParser(Snowflake.Parser):
     FUNCTIONS = {
         **Snowflake.Parser.FUNCTIONS,
         "SYSDATE": _parse_sysdate,
+        "IDENTIFIER": _build_identifier_func,
     }
 
 
@@ -35,10 +51,16 @@ class CustomSnowflakeGenerator(Snowflake.Generator):
         """Generate SQL for SYSDATE() function in Snowflake dialect."""
         return "SYSDATE()"
 
+    def identifierfunc_sql(self, expression: IdentifierFunc) -> str:
+        """Generate SQL for IDENTIFIER() function in Snowflake dialect."""
+        # For Snowflake, always keep as IDENTIFIER() function
+        return self.function_fallback_sql(expression)
+
     # Register custom SQL generators
     TRANSFORMS = {
         **Snowflake.Generator.TRANSFORMS,
         Sysdate: sysdate_sql,
+        IdentifierFunc: identifierfunc_sql,
     }
 
 

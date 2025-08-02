@@ -3,7 +3,7 @@
 from sqlglot import expressions as exp
 from sqlglot.dialects.duckdb import DuckDB
 
-from .expressions import Sysdate
+from .expressions import IdentifierFunc, Sysdate
 
 
 class CustomDuckDBGenerator(DuckDB.Generator):
@@ -54,10 +54,55 @@ class CustomDuckDBGenerator(DuckDB.Generator):
 
         return False
 
+    def identifierfunc_sql(self, expression: IdentifierFunc) -> str:
+        """
+        Generate DuckDB SQL for Snowflake's IDENTIFIER() function.
+
+        For DuckDB, converts IDENTIFIER('literal') to a plain identifier.
+        For non-literals, falls back to function call syntax (which may error).
+        """
+        # For DuckDB, convert IDENTIFIER('literal') to identifier if possible
+        if isinstance(expression.this, exp.Literal) and expression.this.is_string:
+            # Convert string literal to unquoted identifier
+            return str(exp.to_identifier(expression.this.this).sql(dialect=self.dialect))
+
+        # For non-literals (variables, expressions), fallback to function call
+        # This may error in DuckDB, which is appropriate since IDENTIFIER()
+        # is not natively supported
+        return self.function_fallback_sql(expression)
+
+    def anonymous_sql(self, expression: exp.Anonymous) -> str:
+        """
+        Handle Anonymous functions, including IDENTIFIER() that wasn't caught by parser.
+        """
+        # Handle IDENTIFIER() functions that ended up as Anonymous
+        if expression.this.upper() == "IDENTIFIER":
+            return self.identifierfunc_sql_from_anonymous(expression)
+
+        # For all other anonymous functions, use default behavior
+        return super().anonymous_sql(expression)
+
+    def identifierfunc_sql_from_anonymous(self, expression: exp.Anonymous) -> str:
+        """
+        Convert Anonymous IDENTIFIER() to plain identifier for DuckDB.
+        """
+        # Get the first argument
+        args = expression.expressions
+        if args and len(args) >= 1:
+            arg = args[0]
+            # If it's a string literal, convert to unquoted identifier
+            if isinstance(arg, exp.Literal) and arg.is_string:
+                return str(exp.to_identifier(arg.this).sql(dialect=self.dialect))
+
+        # Fallback for non-literals or no args
+        return super().anonymous_sql(expression)
+
     # Register the custom transformation
     TRANSFORMS = {
         **DuckDB.Generator.TRANSFORMS,
         Sysdate: sysdate_sql,
+        IdentifierFunc: identifierfunc_sql,
+        exp.Anonymous: anonymous_sql,
     }
 
 
