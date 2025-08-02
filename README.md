@@ -174,12 +174,68 @@ uv run ruff format src/ tests/
 uv run ruff check src/ tests/
 ```
 
+## Server and REPL
+
+### Starting the HTTP Server
+
+```bash
+# Start the server on default port 8000
+uv run mockhaus server
+
+# Start on a custom port
+uv run mockhaus server --port 9000
+
+# Use a persistent database
+uv run mockhaus server -d my_data.db --port 8080
+```
+
+The server provides a REST API for executing Snowflake queries:
+
+```bash
+# Execute a query
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM sample_customers LIMIT 5"}'
+
+# Check server health
+curl http://localhost:8000/health
+```
+
+### Interactive REPL
+
+```bash
+# Start the REPL with in-memory database
+uv run mockhaus repl
+
+# Start with a persistent database
+uv run mockhaus repl -d my_data.db
+```
+
+REPL features:
+- Syntax highlighting for SQL queries
+- Multi-line query support (use `;` to execute)
+- Command history with arrow keys
+- `.help` - Show available commands
+- `.tables` - List all tables
+- `.schema <table>` - Show table schema
+- `.quit` or Ctrl+D - Exit the REPL
+
+Example REPL session:
+```sql
+mockhaus> SELECT * FROM sample_customers WHERE account_balance > 1000;
+mockhaus> CREATE STAGE my_stage URL = 's3://bucket/path/';
+mockhaus> .tables
+mockhaus> .schema sample_customers
+```
+
 ## Architecture
 
 ```
 src/mockhaus/
 ├── cli.py                          # Command-line interface
 ├── executor.py                     # Main execution engine
+├── server.py                       # HTTP REST server
+├── repl.py                         # Interactive REPL
 ├── snowflake/
 │   ├── translator.py              # Query translation (SELECT, etc.)
 │   ├── ingestion.py               # Data ingestion handler
