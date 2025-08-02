@@ -1,0 +1,11 @@
+- query logging
+- full support for all select queries, inserts, merges etc.
+- logging all queries for debugging and analysis
+-- dbt integration (future future)
+-- in-memory mode?
+-- warehouses
+-- shares
+-- listings
+-- accounts, users, roles, permissions 
+-- data types - variant, objects etc.- 
+- maybe a ducklake mode althought not quite sure what that would achieve
