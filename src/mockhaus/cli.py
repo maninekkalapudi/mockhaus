@@ -57,9 +57,9 @@ def query(sql: Any, file: Any, database: Any, verbose: Any) -> None:
 @main.command()
 @click.option("--host", default="localhost", help="Host to bind server")
 @click.option("--port", default=8080, type=int, help="Port to bind server")
-@click.option("--database", "-d", default=None, help="Default database file")
+@click.option("--database", "-d", default=None, help="Database file (ignored in server mode)")
 @click.option("--daemon", is_flag=True, help="Run as daemon")
-def serve(host: str, port: int, database: str, daemon: bool) -> None:
+def serve(host: str, port: int, database: str | None, daemon: bool) -> None:  # noqa: ARG001
     """Start Mockhaus HTTP server."""
     try:
         import uvicorn
@@ -68,20 +68,16 @@ def serve(host: str, port: int, database: str, daemon: bool) -> None:
         return
 
     console.print(f"[green]Starting Mockhaus server at http://{host}:{port}[/green]")
-
-    if database:
-        console.print(f"[dim]Default database: {database}[/dim]")
-    else:
-        console.print("[dim]Using in-memory database (with sample data)[/dim]")
-
+    console.print("[yellow]⚠️  Server running in IN-MEMORY mode - all data is ephemeral[/yellow]")
+    console.print("[dim]All databases will be lost when server stops[/dim]")
+    console.print("[dim]Query history will persist in ~/.mockhaus/history.duckdb[/dim]")
     console.print(f"[dim]API documentation available at http://{host}:{port}/docs[/dim]")
     console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
 
-    # Set environment variable for default database if specified
-    if database:
-        import os
+    # Set environment variable to enable server mode (in-memory databases)
+    import os
 
-        os.environ["MOCKHAUS_DEFAULT_DATABASE"] = database
+    os.environ["MOCKHAUS_SERVER_MODE"] = "true"
 
     try:
         uvicorn.run("mockhaus.server.app:app", host=host, port=port, reload=not daemon, log_level="info" if not daemon else "warning")

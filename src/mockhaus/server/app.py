@@ -1,10 +1,24 @@
 """FastAPI application setup for Mockhaus server."""
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from .middleware.cors import add_cors_middleware
 from .middleware.logging import add_logging_middleware
 from .routes import health, query
+from .state import server_state
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage application lifecycle."""
+    # Startup: initialize server state
+    yield
+    # Shutdown: cleanup server state
+    server_state.shutdown()
+
 
 # Create FastAPI application
 app = FastAPI(
@@ -13,6 +27,7 @@ app = FastAPI(
     version="0.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Add middleware

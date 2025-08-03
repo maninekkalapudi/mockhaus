@@ -1,13 +1,16 @@
-.PHONY: help install dev test lint format clean
+.PHONY: help install dev test test-unit test-integration test-server lint format clean
 
 help:
 	@echo "Available commands:"
-	@echo "  make install    Install project dependencies"
-	@echo "  make dev        Install development dependencies"
-	@echo "  make test       Run tests"
-	@echo "  make lint       Run linting checks"
-	@echo "  make format     Format code"
-	@echo "  make clean      Clean up generated files"
+	@echo "  make install         Install project dependencies"
+	@echo "  make dev             Install development dependencies"
+	@echo "  make test            Run all tests"
+	@echo "  make test-unit       Run unit tests only"
+	@echo "  make test-integration Run integration tests only"
+	@echo "  make test-server     Run server tests only"
+	@echo "  make lint            Run linting checks"
+	@echo "  make format          Format code"
+	@echo "  make clean           Clean up generated files"
 
 install:
 	uv pip install -e .
@@ -17,6 +20,15 @@ dev:
 
 test:
 	uv run pytest tests/ -v
+
+test-unit:
+	uv run pytest tests/unit/ -v
+
+test-integration:
+	uv run pytest tests/integration/ -v
+
+test-server:
+	uv run pytest tests/server/ -v
 
 lint:
 	@echo "Running ruff..."

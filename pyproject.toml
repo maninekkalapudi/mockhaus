@@ -27,6 +27,7 @@ build-backend = "hatchling.build"
 [tool.uv]
 dev-dependencies = [
   "pytest>=8.4.1",
+  "pytest-asyncio>=0.23.0",
   "ruff>=0.12.7",
   "mypy>=1.17.1",
   "pyright>=1.1.403",
@@ -74,3 +75,9 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "slow: marks tests as slow running",
+]

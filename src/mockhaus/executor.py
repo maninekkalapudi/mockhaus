@@ -47,17 +47,26 @@ class MockhausExecutor:
             history_db_path: Path to history database. If None, uses config or default.
             query_context: Optional context information for query tracking.
         """
+        import os
+
         config = get_config()
 
-        # Use provided values or fall back to config
-        self.database_path = database_path or config.default_database
+        # Detect server mode
+        self.server_mode = os.environ.get("MOCKHAUS_SERVER_MODE") == "true"
+
+        # Force in-memory for server mode
+        if self.server_mode:
+            self.database_path = None  # Always use :memory: in server mode
+        else:
+            self.database_path = database_path or config.default_database
+
         self.use_ast_parser = use_ast_parser if use_ast_parser is not None else config.use_ast_parser
         self.enable_history = enable_history if enable_history is not None else config.history.enabled
 
         self.translator = SnowflakeToDuckDBTranslator()
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._ingestion_handler: SnowflakeIngestionHandler | None = None
-        self._database_manager = SnowflakeDatabaseManager()
+        self._database_manager: SnowflakeDatabaseManager | None = None
 
         # Query history
         self._history: QueryHistory | None = None
@@ -90,6 +99,10 @@ class MockhausExecutor:
         if not self._connection:
             return
 
+        # Initialize database manager with connection and mode
+        in_memory = self.server_mode or self.database_path is None
+        self._database_manager = SnowflakeDatabaseManager(connection=self._connection, in_memory=in_memory)
+
         # Set up some basic configuration that might help with Snowflake compatibility
         with contextlib.suppress(Exception):
             # Enable case-insensitive string comparisons (closer to Snowflake behavior)
@@ -121,10 +134,16 @@ class MockhausExecutor:
         metrics = None
 
         try:
+            # Ensure connection is established
+            if self._connection is None:
+                self.connect()
+
             # Track timing for different phases
             time.time()
 
             # Check if this is a database DDL statement first
+            if self._database_manager is None:
+                raise RuntimeError("Database manager not initialized")
             if self._database_manager.is_database_ddl(snowflake_sql):
                 result = self._database_manager.execute_database_ddl(snowflake_sql)
                 execution_time = (time.time() - start_time) * 1000
