@@ -247,14 +247,16 @@ class MockFileFormatManager:
 
         return options
 
-    def create_temp_format_from_inline(self, inline_spec: str) -> FileFormat:
+    def create_temp_format_from_inline(self, inline_spec: str | dict[str, Any]) -> FileFormat:
         """Create a temporary file format from inline specification."""
-        options = self.parse_inline_format(inline_spec)
-        format_type = options.pop("TYPE", "CSV")
+        options = inline_spec.copy() if isinstance(inline_spec, dict) else self.parse_inline_format(inline_spec)
+
+        format_type = options.pop("TYPE", options.pop("type", "CSV"))
 
         # Create temporary format name
         import hashlib
 
-        temp_name = f"TEMP_{hashlib.md5(inline_spec.encode()).hexdigest()[:8]}"
+        spec_str = str(inline_spec)
+        temp_name = f"TEMP_{hashlib.md5(spec_str.encode()).hexdigest()[:8]}"
 
         return FileFormat(name=temp_name, format_type=format_type, properties=options)

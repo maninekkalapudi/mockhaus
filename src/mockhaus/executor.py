@@ -7,6 +7,7 @@ from typing import Any
 import duckdb
 
 from .config import get_config
+from .logging import debug_log
 from .query_history import QueryContext, QueryHistory, QueryMetrics
 from .snowflake import SnowflakeIngestionHandler, SnowflakeToDuckDBTranslator
 from .snowflake.database_manager import SnowflakeDatabaseManager
@@ -134,6 +135,8 @@ class MockhausExecutor:
         metrics = None
 
         try:
+            debug_log("Executing Snowflake SQL", sql=snowflake_sql)
+
             # Ensure connection is established
             if self._connection is None:
                 self.connect()
@@ -207,8 +210,10 @@ class MockhausExecutor:
 
             # Check if this is a data ingestion statement
             if self._ingestion_handler and self._ingestion_handler.is_data_ingestion_statement(snowflake_sql):
+                debug_log("Detected data ingestion statement", sql=snowflake_sql)
                 result = self._ingestion_handler.execute_ingestion_statement(snowflake_sql)
                 execution_time = (time.time() - start_time) * 1000
+                debug_log("Ingestion complete", success=result["success"], rows_loaded=result.get("rows_loaded", 0))
 
                 query_result = QueryResult(
                     success=result["success"],
@@ -237,13 +242,17 @@ class MockhausExecutor:
 
             # Track translation time
             translation_start = time.time()
+            debug_log("Translating SQL", original=snowflake_sql)
             translated_sql = self.translator.translate(snowflake_sql)
             translation_time = (time.time() - translation_start) * 1000
+            debug_log("SQL translated", translated=translated_sql, translation_time_ms=translation_time)
 
             # Track execution time
             execution_start = time.time()
+            debug_log("Executing DuckDB SQL", sql=translated_sql)
             result = self._execute_duckdb_sql(translated_sql)
             pure_execution_time = (time.time() - execution_start) * 1000
+            debug_log("Execution complete", rows=result["row_count"], execution_time_ms=pure_execution_time)
 
             total_time = (time.time() - start_time) * 1000
 

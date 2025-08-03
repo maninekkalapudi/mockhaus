@@ -5,6 +5,8 @@ from typing import Any
 import sqlglot
 from sqlglot import expressions as exp
 
+from mockhaus.logging import debug_log
+
 
 class SnowflakeASTParser:
     """Parser for Snowflake-specific SQL statements using sqlglot AST."""
@@ -245,21 +247,165 @@ class SnowflakeASTParser:
         """
         try:
             # Parse the SQL into AST
-            sqlglot.parse_one(sql, dialect=self.dialect)
+            ast = sqlglot.parse_one(sql, dialect=self.dialect)
 
-            # Handle COPY INTO statements (sqlglot may not have perfect support)
-            # Let's check if it's parsed as a Command or other node type
-            sql_upper = sql.upper().strip()
-            if not sql_upper.startswith("COPY INTO"):
+            # Verify it's a COPY statement
+            if not isinstance(ast, exp.Copy):
                 return {"error": "Not a COPY INTO statement"}
 
-            # For COPY INTO, we'll need to do some manual parsing since sqlglot
-            # may not have full support for Snowflake's COPY INTO syntax
-            return self._parse_copy_into_manual(sql)
+            # Extract table name
+            table = ast.this
+            if not table:
+                return {"error": "Target table not found"}
 
-        except Exception:
+            # Build full table name
+            table_parts = []
+            if hasattr(table, "catalog") and table.catalog:
+                table_parts.append(str(table.catalog))
+            if hasattr(table, "db") and table.db:
+                table_parts.append(str(table.db))
+            table_parts.append(str(table.this))
+            table_name = ".".join(table_parts)
+
+            # Extract stage reference from files
+            files = ast.args.get("files", [])
+            if not files:
+                return {"error": "No source files specified"}
+
+            # Get the stage reference (it's stored as a Table with a Literal)
+            stage_ref = files[0]
+            stage_reference = stage_ref.this.this if hasattr(stage_ref, "this") and hasattr(stage_ref.this, "this") else str(stage_ref)
+
+            # Extract file format and other parameters
+            params = ast.args.get("params", [])
+            file_format_name = None
+            inline_format = None  # String representation of inline format
+            inline_format_options = {}  # Parsed dictionary
+            options = {}
+
+            for param in params:
+                if hasattr(param, "this"):
+                    param_name = str(param.this).upper()
+
+                    if param_name == "FILE_FORMAT":
+                        # Check if it has an expression (named format)
+                        if hasattr(param, "expression") and param.expression:
+                            param_value = param.expression
+                            if hasattr(param_value, "this"):
+                                # Named format: FILE_FORMAT = 'format_name'
+                                file_format_name = param_value.this
+                        # Check if it has expressions (inline format)
+                        elif hasattr(param, "expressions") and param.expressions:
+                            # Inline format: FILE_FORMAT = (TYPE = 'CSV' ...)
+                            inline_format_options = self._parse_inline_format_from_properties(param.expressions)
+                            # Reconstruct the string format for backward compatibility
+                            format_parts = []
+                            for key, value in inline_format_options.items():
+                                if key == "TYPE":
+                                    format_parts.append(f"TYPE = '{value}'")
+                                elif key == "field_delimiter":
+                                    format_parts.append(f"FIELD_DELIMITER = '{value}'")
+                                elif key == "skip_header":
+                                    format_parts.append(f"SKIP_HEADER = {value}")
+                                elif key == "field_optionally_enclosed_by":
+                                    format_parts.append(f"FIELD_OPTIONALLY_ENCLOSED_BY = '{value}'")
+                                elif key == "record_delimiter":
+                                    format_parts.append(f"RECORD_DELIMITER = '{value}'")
+                                else:
+                                    format_parts.append(f"{key.upper()} = '{value}'")
+                            inline_format = " ".join(format_parts)
+                    elif hasattr(param, "expression") and param.expression:
+                        param_value = param.expression
+                        if param_name == "PATTERN":
+                            options["pattern"] = param_value.this if hasattr(param_value, "this") else str(param_value)
+                        elif param_name == "VALIDATION_MODE":
+                            options["validation_mode"] = param_value.this if hasattr(param_value, "this") else str(param_value)
+                        else:
+                            # Store other options
+                            options[param_name.lower()] = param_value.this if hasattr(param_value, "this") else str(param_value)
+
+            return {
+                "table_name": table_name,
+                "stage_reference": stage_reference,
+                "file_format_name": file_format_name,
+                "inline_format": inline_format,
+                "inline_format_options": inline_format_options,
+                "options": options,
+                "error": None,
+            }
+
+        except Exception as e:
+            debug_log(f"AST parsing failed for COPY INTO: {e}, falling back to manual parsing")
             # Fall back to manual parsing if AST parsing fails
             return self._parse_copy_into_manual(sql)
+
+    def _parse_inline_format_from_properties(self, properties: list[exp.Property]) -> dict[str, Any]:
+        """Parse inline file format from property list."""
+        inline_format: dict[str, Any] = {}
+
+        for prop in properties:
+            if isinstance(prop, exp.Property) and prop.this and "value" in prop.args:
+                key = str(prop.this).upper()
+                value_expr = prop.args["value"]
+
+                # Extract the actual value
+                value = value_expr.this if hasattr(value_expr, "this") else str(value_expr)
+
+                # Store properties with original case for test compatibility
+                if key == "TYPE":
+                    inline_format["TYPE"] = value.upper() if isinstance(value, str) else str(value).upper()
+                elif key == "FIELD_DELIMITER":
+                    inline_format["field_delimiter"] = value
+                elif key == "SKIP_HEADER":
+                    try:
+                        inline_format["skip_header"] = int(value)
+                    except (ValueError, TypeError):
+                        inline_format["skip_header"] = str(value)
+                elif key == "FIELD_OPTIONALLY_ENCLOSED_BY":
+                    inline_format["field_optionally_enclosed_by"] = value
+                elif key == "RECORD_DELIMITER":
+                    inline_format["record_delimiter"] = value
+                elif key == "COMPRESSION":
+                    inline_format["compression"] = value.upper() if isinstance(value, str) else str(value).upper()
+                else:
+                    inline_format[key] = value
+
+        return inline_format
+
+    def _parse_inline_format(self, format_expr: exp.Expression) -> dict[str, Any]:
+        """Parse inline file format specification from AST."""
+        inline_format: dict[str, Any] = {}
+
+        # Handle parenthesized expressions like (TYPE = 'CSV', SKIP_HEADER = 1)
+        if hasattr(format_expr, "expressions"):
+            for expr in format_expr.expressions:
+                if isinstance(expr, exp.EQ) and hasattr(expr, "this") and hasattr(expr, "expression"):
+                    key = str(expr.this).upper()
+                    value = expr.expression
+
+                    # Extract the actual value
+                    value = value.this if hasattr(value, "this") else str(value)
+
+                    # Map common format properties
+                    if key == "TYPE":
+                        inline_format["type"] = value.upper() if isinstance(value, str) else str(value).upper()
+                    elif key == "FIELD_DELIMITER":
+                        inline_format["field_delimiter"] = value
+                    elif key == "SKIP_HEADER":
+                        try:
+                            inline_format["skip_header"] = int(value)
+                        except (ValueError, TypeError):
+                            inline_format["skip_header"] = str(value)
+                    elif key == "FIELD_OPTIONALLY_ENCLOSED_BY":
+                        inline_format["field_optionally_enclosed_by"] = value
+                    elif key == "RECORD_DELIMITER":
+                        inline_format["record_delimiter"] = value
+                    elif key == "COMPRESSION":
+                        inline_format["compression"] = value.upper() if isinstance(value, str) else str(value).upper()
+                    else:
+                        inline_format[key.lower()] = value
+
+        return inline_format
 
     def _parse_copy_into_manual(self, sql: str) -> dict[str, Any]:
         """

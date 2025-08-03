@@ -312,7 +312,7 @@ class TestASTParser(unittest.TestCase):
         assert result["inline_format_options"]["TYPE"] == "CSV"
         assert result["inline_format_options"]["field_delimiter"] == "|"
         assert result["inline_format_options"]["field_optionally_enclosed_by"] == '"'
-        assert result["inline_format_options"]["record_delimiter"] == "\\r\\n"
+        assert result["inline_format_options"]["record_delimiter"] == "\r\n"
 
     def test_parse_copy_into_quoted_stage_reference(self) -> None:
         """Test parsing COPY INTO with quoted stage reference."""

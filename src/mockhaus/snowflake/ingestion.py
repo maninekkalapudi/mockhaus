@@ -5,6 +5,7 @@ from typing import Any
 
 import duckdb
 
+from ..logging import debug_log
 from .ast_parser import SnowflakeASTParser
 from .copy_into import CopyIntoTranslator
 from .file_formats import MockFileFormatManager
@@ -43,6 +44,7 @@ class SnowflakeIngestionHandler:
     def execute_ingestion_statement(self, sql: str) -> dict[str, Any]:
         """Execute data ingestion statements."""
         sql_upper = sql.strip().upper()
+        debug_log("we are here")
 
         try:
             if sql_upper.startswith("CREATE STAGE"):
@@ -50,6 +52,7 @@ class SnowflakeIngestionHandler:
             if sql_upper.startswith("CREATE FILE FORMAT"):
                 return self._execute_create_file_format(sql)
             if sql_upper.startswith("COPY INTO"):
+                debug_log("we are here 234")
                 return self.copy_translator.execute_copy_operation(sql, self.connection)
             if sql_upper.startswith("DROP STAGE"):
                 return self._execute_drop_stage(sql)

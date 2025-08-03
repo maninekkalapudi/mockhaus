@@ -11,10 +11,11 @@ class TestConfigurableParsing(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test environment."""
         # Create two executors: one with regex, one with AST
-        self.regex_executor = MockhausExecutor(use_ast_parser=False)
+        # Use in-memory history database for tests to avoid locking issues
+        self.regex_executor = MockhausExecutor(use_ast_parser=False, enable_history=True, history_db_path=":memory:")
         self.regex_executor.connect()
 
-        self.ast_executor = MockhausExecutor(use_ast_parser=True)
+        self.ast_executor = MockhausExecutor(use_ast_parser=True, enable_history=True, history_db_path=":memory:")
         self.ast_executor.connect()
 
     def tearDown(self) -> None:

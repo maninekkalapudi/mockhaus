@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..logging import debug_log
 from .ast_parser import SnowflakeASTParser
 from .file_formats import FileFormat, MockFileFormatManager
 from .stages import MockStageManager
@@ -44,9 +45,12 @@ class CopyIntoTranslator:
 
     def _parse_copy_into_with_ast(self, sql: str) -> CopyIntoContext:
         """Parse COPY INTO statement using AST parser."""
+        debug_log(f"Parsing COPY INTO statement with AST parser: {sql}")
         if not self.ast_parser:
             raise ValueError("AST parser is not available")
         parsed = self.ast_parser.parse_copy_into(sql)
+
+        debug_log(f"Parsed COPY INTO statement: {parsed}")
 
         if parsed.get("error"):
             raise ValueError(f"Failed to parse COPY INTO statement: {parsed['error']}")
@@ -62,17 +66,17 @@ class CopyIntoTranslator:
             context.file_format = self.format_manager.get_format(parsed["file_format_name"])
             if not context.file_format:
                 raise ValueError(f"File format '{parsed['file_format_name']}' not found")
-        elif parsed.get("inline_format"):
-            context.inline_format = parsed["inline_format"]
-            context.file_format = self.format_manager.create_temp_format_from_inline(parsed["inline_format"])
+        elif parsed.get("inline_format_options"):
+            context.inline_format = parsed["inline_format"]  # String representation for backward compatibility
+            context.file_format = self.format_manager.create_temp_format_from_inline(parsed["inline_format_options"])
 
         # Handle other options
         options = parsed.get("options", {})
-        context.on_error = options.get("ON_ERROR", "ABORT").upper()
-        context.force = options.get("FORCE", False)
-        context.purge = options.get("PURGE", False)
-        context.pattern = options.get("PATTERN")
-        context.validation_mode = options.get("VALIDATION_MODE")
+        context.on_error = options.get("on_error", options.get("ON_ERROR", "ABORT")).upper()
+        context.force = options.get("force", options.get("FORCE", False))
+        context.purge = options.get("purge", options.get("PURGE", False))
+        context.pattern = options.get("pattern", options.get("PATTERN"))
+        context.validation_mode = options.get("validation_mode", options.get("VALIDATION_MODE"))
 
         return context
 
@@ -163,7 +167,9 @@ class CopyIntoTranslator:
     def translate_copy_into(self, sql: str) -> str:
         """Translate a COPY INTO statement to DuckDB COPY statement."""
         # Parse the COPY INTO statement
+        debug_log(f"Translating COPY INTO statement: {sql}")
         context = self.parse_copy_into_statement(sql)
+        debug_log(f"Parsed COPY INTO context: {context}")
 
         # Resolve file path from stage reference
         resolved_path = self.stage_manager.resolve_stage_path(context.stage_reference)
@@ -172,18 +178,19 @@ class CopyIntoTranslator:
 
         context.file_path = resolved_path
 
-        # Check if file exists
+        # Check if file exists or if we need pattern matching
         file_path = Path(context.file_path)
-        if not file_path.exists():
-            if context.pattern:
-                # Handle pattern matching
-                files = self._find_files_by_pattern(file_path.parent, context.pattern)
-                if not files:
-                    raise FileNotFoundError(f"No files found matching pattern '{context.pattern}' in {file_path.parent}")
-                # For simplicity, use the first matching file
-                context.file_path = str(files[0])
-            else:
-                raise FileNotFoundError(f"File not found: {context.file_path}")
+
+        if context.pattern:
+            # When pattern is specified, treat file_path as directory
+            search_dir = file_path if file_path.is_dir() else file_path.parent
+            files = self._find_files_by_pattern(search_dir, context.pattern)
+            if not files:
+                raise FileNotFoundError(f"No files found matching pattern '{context.pattern}' in {search_dir}")
+            # For simplicity, use the first matching file
+            context.file_path = str(files[0])
+        elif not file_path.exists():
+            raise FileNotFoundError(f"File not found: {context.file_path}")
 
         # Generate DuckDB COPY statement
         return self._generate_duckdb_copy(context)
@@ -253,7 +260,9 @@ class CopyIntoTranslator:
         """Execute COPY INTO operation and return results."""
         try:
             # Translate to DuckDB COPY
+            debug_log("Starting COPY operation translation")
             duckdb_sql = self.translate_copy_into(sql)
+            debug_log(f"duckdb sql  {duckdb_sql}")
 
             # Execute the translated statement
             result = connection.execute(duckdb_sql)
@@ -268,4 +277,5 @@ class CopyIntoTranslator:
             return {"success": True, "rows_loaded": row_count, "original_sql": sql, "translated_sql": duckdb_sql, "errors": []}
 
         except Exception as e:
+            debug_log(f"Error executing COPY INTO operation: {e}")
             return {"success": False, "rows_loaded": 0, "original_sql": sql, "translated_sql": "", "errors": [str(e)]}

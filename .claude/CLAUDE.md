@@ -20,3 +20,6 @@
 # Docs
 - Docs must be concise and easy to read
 - After you make all the code changes are done with implementing a feature, make sure to review all .md files and ensure that the docs are updated. Especially the README.md
+
+# Web search
+Use vibe-tools web search to find information about libraries, APIs, and other technical details. Use the `web` command to search.

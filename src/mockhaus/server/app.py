@@ -1,11 +1,13 @@
 """FastAPI application setup for Mockhaus server."""
 
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from .middleware.cors import add_cors_middleware
+from .middleware.debug_logging import add_debug_logging_middleware
 from .middleware.logging import add_logging_middleware
 from .routes import health, query
 from .state import server_state
@@ -33,6 +35,10 @@ app = FastAPI(
 # Add middleware
 add_cors_middleware(app)
 add_logging_middleware(app)
+
+# Add debug logging if MOCKHAUS_DEBUG is set
+debug_enabled = os.environ.get("MOCKHAUS_DEBUG", "").lower() in ("true", "1", "yes")
+add_debug_logging_middleware(app, debug=debug_enabled)
 
 # Include routers
 app.include_router(query.router, prefix="/api/v1")
