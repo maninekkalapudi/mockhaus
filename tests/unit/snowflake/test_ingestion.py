@@ -338,11 +338,11 @@ class TestDataIngestion(unittest.TestCase):
         options = format_manager.map_to_duckdb_options(csv_format)
 
         assert options["FORMAT"] == "CSV"
-        assert options["DELIMITER"] == "|"
-        assert options["HEADER"] is True
-        assert options["QUOTE"] == '"'
-        assert options["NULL"] == "NULL"  # First null value
-        assert options["DATEFORMAT"] == "YYYY-MM-DD"
+        assert options["delimiter"] == "|"
+        assert options["header"] is True
+        assert options["quote"] == '"'
+        assert options["nullstr"] == "NULL"  # First null value
+        assert options["dateformat"] == "YYYY-MM-DD"
 
     def test_inline_format_parsing(self) -> None:
         """Test parsing of inline format specifications."""
