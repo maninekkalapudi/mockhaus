@@ -32,10 +32,10 @@ Mockhaus translates Snowflake SQL queries to DuckDB SQL and executes them locall
 uv sync
 
 # Start the HTTP server (uses in-memory session-based database)
-uv run mockhaus serve
+uv run mockhaus serve --host localhost --port 8081 
 
-# Run tests
-uv run pytest -v
+# Run REPL 
+MOCKHAUS_SERVER_URL=http://localhost:8081 uv run mockhaus repl
 ```
 
 ## Server and REPL
@@ -49,7 +49,6 @@ uv run mockhaus serve
 # Start on a custom port
 uv run mockhaus serve --port 9000
 
-# Note: -d flag is ignored in server mode (always uses in-memory database)
 ```
 
 The server provides a REST API for executing Snowflake queries:
@@ -73,7 +72,9 @@ The REPL is a client that connects to the Mockhaus HTTP server. You need to run 
 uv run mockhaus serve
 
 # Step 2: Run the REPL client (in another terminal)
-uv run mockhaus repl
+MOCKHAUS_SERVER_URL=http://localhost:8081 uv run mockhaus repl
+```
+```
 ```
 
 You can also configure the server connection:
