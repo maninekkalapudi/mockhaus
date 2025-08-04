@@ -6,7 +6,6 @@ from typing import Any
 
 import duckdb
 
-from .config import get_config
 from .logging import debug_log
 from .query_history import QueryContext, QueryHistory, QueryMetrics
 from .snowflake import SnowflakeIngestionHandler, SnowflakeToDuckDBTranslator
@@ -32,58 +31,34 @@ class MockhausExecutor:
 
     def __init__(
         self,
-        database_path: str | None = None,
-        use_ast_parser: bool | None = None,
-        enable_history: bool | None = None,
-        history_db_path: str | None = None,
         query_context: QueryContext | None = None,
     ) -> None:
         """
         Initialize the executor.
 
         Args:
-            database_path: Path to DuckDB database file. If None, uses in-memory database.
-            use_ast_parser: Whether to use AST parser for ingestion statements. If None, uses config.
-            enable_history: Whether to enable query history tracking. If None, uses config.
-            history_db_path: Path to history database. If None, uses config or default.
             query_context: Optional context information for query tracking.
         """
-        import os
-
-        config = get_config()
-
-        # Detect server mode
-        self.server_mode = os.environ.get("MOCKHAUS_SERVER_MODE") == "true"
-
-        # Force in-memory for server mode
-        if self.server_mode:
-            self.database_path = None  # Always use :memory: in server mode
-        else:
-            self.database_path = database_path or config.default_database
-
-        self.use_ast_parser = use_ast_parser if use_ast_parser is not None else config.use_ast_parser
-        self.enable_history = enable_history if enable_history is not None else config.history.enabled
+        # Always use in-memory database
+        self.database_path = None
 
         self.translator = SnowflakeToDuckDBTranslator()
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._ingestion_handler: SnowflakeIngestionHandler | None = None
         self._database_manager: SnowflakeDatabaseManager | None = None
 
-        # Query history
-        self._history: QueryHistory | None = None
-        if self.enable_history:
-            history_path = history_db_path or config.history.db_path
-            self._history = QueryHistory(history_path)
+        # Query history - always enabled as in-memory table
+        self._history = QueryHistory()
         self.query_context = query_context or QueryContext()
 
     def connect(self) -> None:
         """Establish connection to DuckDB."""
         if self._connection is None:
-            # Use ":memory:" for in-memory database when path is None
-            db_path = self.database_path if self.database_path is not None else ":memory:"
-            self._connection = duckdb.connect(db_path)
+            # Always use in-memory database
+            self._connection = duckdb.connect(":memory:")
             self._setup_database()
             self._setup_data_ingestion()
+            self._setup_history()
 
     def disconnect(self) -> None:
         """Close the DuckDB connection."""
@@ -91,7 +66,7 @@ class MockhausExecutor:
             self._connection.close()
             self._connection = None
 
-        # Also close history connection
+        # Reset history state
         if self._history:
             self._history.close()
 
@@ -100,9 +75,8 @@ class MockhausExecutor:
         if not self._connection:
             return
 
-        # Initialize database manager with connection and mode
-        in_memory = self.server_mode or self.database_path is None
-        self._database_manager = SnowflakeDatabaseManager(connection=self._connection, in_memory=in_memory)
+        # Initialize database manager with connection (always in-memory mode)
+        self._database_manager = SnowflakeDatabaseManager(connection=self._connection)
 
         # Set up some basic configuration that might help with Snowflake compatibility
         with contextlib.suppress(Exception):
@@ -115,8 +89,13 @@ class MockhausExecutor:
         if not self._connection:
             return
 
-        # Initialize ingestion handler with parser preference
-        self._ingestion_handler = SnowflakeIngestionHandler(self._connection, self.use_ast_parser)
+        # Initialize ingestion handler (always use AST parser)
+        self._ingestion_handler = SnowflakeIngestionHandler(self._connection)
+
+    def _setup_history(self) -> None:
+        """Set up query history with the main connection."""
+        if self._history and self._connection:
+            self._history.connect(self._connection)
 
     def execute_snowflake_sql(self, snowflake_sql: str) -> QueryResult:
         """
@@ -152,14 +131,10 @@ class MockhausExecutor:
                 execution_time = (time.time() - start_time) * 1000
 
                 if result["success"]:
-                    # For USE DATABASE commands, switch to the new database
-                    if "database_path" in result:
-                        self.database_path = result["database_path"]
+                    # For USE DATABASE commands, update context
+                    if "database_name" in result:
                         # Update context with new database
                         self.query_context.database_name = result.get("database_name")
-                        # Reconnect to the new database
-                        self.disconnect()
-                        self.connect()
 
                     # Format response based on command type
                     data = None
@@ -192,7 +167,7 @@ class MockhausExecutor:
                     )
 
                 # Record in history
-                if self._history and self.enable_history:
+                if self._history:
                     self._history.record_query(
                         original_sql=snowflake_sql,
                         translated_sql=query_result.translated_sql,
@@ -227,7 +202,7 @@ class MockhausExecutor:
                 )
 
                 # Record in history
-                if self._history and self.enable_history:
+                if self._history:
                     self._history.record_query(
                         original_sql=snowflake_sql,
                         translated_sql=query_result.translated_sql,
@@ -267,7 +242,7 @@ class MockhausExecutor:
             )
 
             # Record in history with metrics
-            if self._history and self.enable_history:
+            if self._history:
                 query_id = self._history.record_query(
                     original_sql=snowflake_sql,
                     translated_sql=translated_sql,
@@ -300,7 +275,7 @@ class MockhausExecutor:
             )
 
             # Record failed query in history
-            if self._history and self.enable_history:
+            if self._history:
                 self._history.record_query(
                     original_sql=snowflake_sql,
                     translated_sql="",

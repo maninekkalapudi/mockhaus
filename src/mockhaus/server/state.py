@@ -1,6 +1,5 @@
 """Global server state management for persistent connections."""
 
-import os
 from collections.abc import Generator
 from contextlib import contextmanager
 
@@ -26,11 +25,8 @@ class ServerState:
 
     def _initialize(self) -> None:
         """Initialize the global executor for server mode."""
-        # Ensure server mode is set
-        os.environ["MOCKHAUS_SERVER_MODE"] = "true"
-
         # Create persistent executor
-        self._executor = MockhausExecutor(database_path=None)
+        self._executor = MockhausExecutor()
         self._executor.connect()
 
         # Create sample data in main database

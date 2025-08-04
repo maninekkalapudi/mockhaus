@@ -2,7 +2,6 @@
 
 import tempfile
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -31,24 +30,28 @@ class TestQueryHistory:
     @pytest.fixture
     def history(self, temp_history_db):
         """Create a QueryHistory instance with temporary database."""
-        history = QueryHistory(temp_history_db)
-        history.connect()
+        import duckdb
+
+        connection = duckdb.connect(temp_history_db)
+        history = QueryHistory()
+        history.connect(connection)
         yield history
         history.close()
+        connection.close()
 
     def test_init_schema(self, history):
         """Test that schema and tables are created correctly."""
+        schema_name = history._get_schema_name()
+
         # Check schema exists
-        result = history._connection.execute(
-            "SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?", [QueryHistory.SCHEMA_NAME]
-        ).fetchone()
+        result = history._connection.execute(f"SELECT schema_name FROM information_schema.schemata WHERE schema_name = '{schema_name}'").fetchone()
         assert result is not None
 
         # Check tables exist
         tables = ["query_history", "query_metrics"]
         for table in tables:
             result = history._connection.execute(
-                "SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name = ?", [QueryHistory.SCHEMA_NAME, table]
+                f"SELECT table_name FROM information_schema.tables WHERE table_schema = '{schema_name}' AND table_name = '{table}'"
             ).fetchone()
             assert result is not None
 
@@ -314,99 +317,61 @@ class TestQueryHistory:
 class TestExecutorWithHistory:
     """Test query history integration with MockhausExecutor."""
 
-    @pytest.fixture
-    def temp_db(self):
-        """Create temporary databases for testing."""
-        import os
-        import shutil
-
-        # Create a temporary directory and generate db paths within it
-        temp_dir = tempfile.mkdtemp()
-        main_db = os.path.join(temp_dir, "main.duckdb")
-        history_db = os.path.join(temp_dir, "history.duckdb")
-
-        yield main_db, history_db
-
-        # Cleanup
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-    def test_executor_records_history(self, temp_db):
+    def test_executor_records_history(self):
         """Test that executor records queries in history."""
-        main_db, history_db = temp_db
-
-        executor = MockhausExecutor(database_path=main_db, enable_history=True, history_db_path=history_db)
+        context = QueryContext(session_id="test-session", database_name="test_db", user="test_user")
+        executor = MockhausExecutor(query_context=context)
+        executor.connect()
 
         # Execute a query
         result = executor.execute_snowflake_sql("SELECT 1 as test")
         assert result.success
 
-        # Check history was recorded
-        history = QueryHistory(history_db)
-        records = history.get_recent(limit=1)
+        # Check history was recorded via the executor's history
+        records = executor._history.get_recent(limit=1)
 
         assert len(records) == 1
         assert records[0].original_sql == "SELECT 1 as test"
         assert records[0].status == "SUCCESS"
         assert records[0].rows_affected == 1
 
-        history.close()
         executor.disconnect()
 
-    def test_executor_records_errors(self, temp_db):
+    def test_executor_records_errors(self):
         """Test that executor records failed queries."""
-        main_db, history_db = temp_db
-
-        executor = MockhausExecutor(database_path=main_db, enable_history=True, history_db_path=history_db)
+        context = QueryContext(session_id="test-session", database_name="test_db", user="test_user")
+        executor = MockhausExecutor(query_context=context)
+        executor.connect()
 
         # Execute a failing query
         result = executor.execute_snowflake_sql("SELECT * FROM nonexistent_table")
         assert not result.success
 
         # Check error was recorded
-        history = QueryHistory(history_db)
-        records = history.get_recent(limit=1)
+        records = executor._history.get_recent(limit=1)
 
         assert len(records) == 1
         assert records[0].status == "ERROR"
         assert records[0].error_message is not None
 
-        history.close()
         executor.disconnect()
 
-    def test_executor_with_context(self, temp_db):
+    def test_executor_with_context(self):
         """Test executor with custom query context."""
-        main_db, history_db = temp_db
-
         context = QueryContext(session_id="test-session", user="test_user", database_name="test_db")
 
-        executor = MockhausExecutor(database_path=main_db, enable_history=True, history_db_path=history_db, query_context=context)
+        executor = MockhausExecutor(query_context=context)
+        executor.connect()
 
         # Execute a query
         executor.execute_snowflake_sql("SELECT 1")
 
         # Check context was recorded
-        history = QueryHistory(history_db)
-        records = history.get_recent(limit=1)
+        records = executor._history.get_recent(limit=1)
 
         assert len(records) == 1
         assert records[0].session_id == "test-session"
         assert records[0].user == "test_user"
         assert records[0].database_name == "test_db"
-
-        history.close()
-        executor.disconnect()
-
-    def test_executor_history_disabled(self, temp_db):
-        """Test executor with history disabled."""
-        main_db, history_db = temp_db
-
-        executor = MockhausExecutor(database_path=main_db, enable_history=False)
-
-        # Execute a query
-        result = executor.execute_snowflake_sql("SELECT 1")
-        assert result.success
-
-        # Verify no history was created
-        assert not Path(history_db).exists()
 
         executor.disconnect()

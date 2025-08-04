@@ -18,6 +18,8 @@ FROM '@~/customers.csv'
 FILE_FORMAT = (TYPE = 'CSV' SKIP_HEADER = 1);
 ```
 
+**Note:** In server mode, the COPY INTO operations work with in-memory session state. In CLI mode, you can use both in-memory and file-based databases.
+
 ## Stage Types
 
 Mockhaus supports all Snowflake stage types, mapping them to your local filesystem:

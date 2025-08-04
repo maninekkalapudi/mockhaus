@@ -1,7 +1,5 @@
 """Test in-memory server functionality."""
 
-import os
-
 from mockhaus.executor import MockhausExecutor
 
 
@@ -9,37 +7,19 @@ class TestInMemoryServer:
     """Test in-memory server mode functionality."""
 
     def test_server_mode_detection(self):
-        """Test that server mode is properly detected from environment variable."""
-        # Test without server mode
-        if "MOCKHAUS_SERVER_MODE" in os.environ:
-            del os.environ["MOCKHAUS_SERVER_MODE"]
-
+        """Test that executor is always in-memory mode."""
+        # Executor is now always in-memory
         executor = MockhausExecutor()
-        assert executor.server_mode is False
-
-        # Test with server mode
-        os.environ["MOCKHAUS_SERVER_MODE"] = "true"
-        executor = MockhausExecutor()
-        assert executor.server_mode is True
-
-        # Clean up
-        del os.environ["MOCKHAUS_SERVER_MODE"]
+        assert executor.database_path is None  # Always in-memory
 
     def test_server_mode_forces_in_memory(self):
-        """Test that server mode forces in-memory database."""
-        os.environ["MOCKHAUS_SERVER_MODE"] = "true"
-
-        # Even if we provide a database path, it should be overridden
-        executor = MockhausExecutor(database_path="/some/path/test.db")
+        """Test that executor is always in-memory regardless of parameters."""
+        # Executor is always in-memory now, constructor doesn't accept database_path
+        executor = MockhausExecutor()
         assert executor.database_path is None
-
-        # Clean up
-        del os.environ["MOCKHAUS_SERVER_MODE"]
 
     def test_in_memory_database_operations(self):
         """Test basic database operations in in-memory mode."""
-        os.environ["MOCKHAUS_SERVER_MODE"] = "true"
-
         with MockhausExecutor() as executor:
             # Test CREATE DATABASE
             result = executor.execute_snowflake_sql("CREATE DATABASE test_db")
@@ -83,13 +63,8 @@ class TestInMemoryServer:
             db_names = [db["name"] for db in result.data]
             assert "test_db" not in db_names
 
-        # Clean up
-        del os.environ["MOCKHAUS_SERVER_MODE"]
-
     def test_cross_database_queries(self):
         """Test queries across multiple in-memory databases."""
-        os.environ["MOCKHAUS_SERVER_MODE"] = "true"
-
         with MockhausExecutor() as executor:
             # Create two databases
             executor.execute_snowflake_sql("CREATE DATABASE sales")
@@ -117,13 +92,8 @@ class TestInMemoryServer:
             assert result.data[0]["name"] == "Alice"
             assert float(result.data[0]["value"]) == 100.5
 
-        # Clean up
-        del os.environ["MOCKHAUS_SERVER_MODE"]
-
     def test_database_ddl_error_handling(self):
         """Test error handling for database DDL operations."""
-        os.environ["MOCKHAUS_SERVER_MODE"] = "true"
-
         with MockhausExecutor() as executor:
             # Test creating duplicate database
             executor.execute_snowflake_sql("CREATE DATABASE test_db")
@@ -153,6 +123,3 @@ class TestInMemoryServer:
             result = executor.execute_snowflake_sql("USE non_existent")
             assert not result.success
             assert "does not exist" in result.error
-
-        # Clean up
-        del os.environ["MOCKHAUS_SERVER_MODE"]

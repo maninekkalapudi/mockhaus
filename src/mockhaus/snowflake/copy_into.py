@@ -1,6 +1,5 @@
 """COPY INTO statement translation for Mockhaus data ingestion."""
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -30,24 +29,19 @@ class CopyIntoContext:
 class CopyIntoTranslator:
     """Translates Snowflake COPY INTO statements to DuckDB COPY statements."""
 
-    def __init__(self, stage_manager: MockStageManager, format_manager: MockFileFormatManager, use_ast_parser: bool = True) -> None:
+    def __init__(self, stage_manager: MockStageManager, format_manager: MockFileFormatManager) -> None:
         """Initialize COPY INTO translator."""
         self.stage_manager = stage_manager
         self.format_manager = format_manager
-        self.use_ast_parser = use_ast_parser
-        self.ast_parser = SnowflakeASTParser() if use_ast_parser else None
+        self.ast_parser = SnowflakeASTParser()
 
     def parse_copy_into_statement(self, sql: str) -> CopyIntoContext:
         """Parse a COPY INTO statement and extract components."""
-        if self.use_ast_parser and self.ast_parser:
-            return self._parse_copy_into_with_ast(sql)
-        return self._parse_copy_into_with_regex(sql)
+        return self._parse_copy_into_with_ast(sql)
 
     def _parse_copy_into_with_ast(self, sql: str) -> CopyIntoContext:
         """Parse COPY INTO statement using AST parser."""
         debug_log(f"Parsing COPY INTO statement with AST parser: {sql}")
-        if not self.ast_parser:
-            raise ValueError("AST parser is not available")
         parsed = self.ast_parser.parse_copy_into(sql)
 
         debug_log(f"Parsed COPY INTO statement: {parsed}")
@@ -79,90 +73,6 @@ class CopyIntoTranslator:
         context.validation_mode = options.get("validation_mode", options.get("VALIDATION_MODE"))
 
         return context
-
-    def _parse_copy_into_with_regex(self, sql: str) -> CopyIntoContext:
-        """Parse COPY INTO statement using regex (legacy method)."""
-        # Remove extra whitespace and normalize
-        sql = re.sub(r"\s+", " ", sql.strip())
-
-        # Basic pattern for COPY INTO
-        # COPY INTO table_name FROM stage_reference [FILE_FORMAT = ...] [OPTIONS]
-        copy_pattern = r'COPY\s+INTO\s+(\w+)\s+FROM\s+([\'"]?@[^\'"\s]+[\'"]?)'
-
-        match = re.search(copy_pattern, sql, re.IGNORECASE)
-        if not match:
-            raise ValueError(f"Invalid COPY INTO statement: {sql}")
-
-        table_name = match.group(1)
-        stage_reference = match.group(2).strip("'\"")
-
-        context = CopyIntoContext(
-            table_name=table_name,
-            stage_reference=stage_reference,
-            file_path="",  # Will be resolved later
-        )
-
-        # Extract file format specification
-        self._parse_file_format(sql, context)
-
-        # Extract other options
-        self._parse_copy_options(sql, context)
-
-        return context
-
-    def _parse_file_format(self, sql: str, context: CopyIntoContext) -> None:
-        """Parse file format specification from COPY INTO statement."""
-        # Look for FILE_FORMAT = (FORMAT_NAME = 'name') or FILE_FORMAT = 'name'
-        format_name_pattern = r'FILE_FORMAT\s*=\s*\(\s*FORMAT_NAME\s*=\s*[\'"](\w+)[\'"]\s*\)'
-        format_direct_pattern = r'FILE_FORMAT\s*=\s*[\'"](\w+)[\'"]'
-
-        # Look for inline format specification
-        inline_pattern = r"FILE_FORMAT\s*=\s*\(([^)]+)\)"
-
-        format_name_match = re.search(format_name_pattern, sql, re.IGNORECASE)
-        format_direct_match = re.search(format_direct_pattern, sql, re.IGNORECASE)
-        inline_match = re.search(inline_pattern, sql, re.IGNORECASE)
-
-        if format_name_match:
-            format_name = format_name_match.group(1)
-            context.file_format = self.format_manager.get_format(format_name)
-            if not context.file_format:
-                raise ValueError(f"File format '{format_name}' not found")
-        elif format_direct_match:
-            format_name = format_direct_match.group(1)
-            context.file_format = self.format_manager.get_format(format_name)
-            if not context.file_format:
-                raise ValueError(f"File format '{format_name}' not found")
-        elif inline_match:
-            inline_spec = inline_match.group(1)
-            context.inline_format = inline_spec
-            context.file_format = self.format_manager.create_temp_format_from_inline(inline_spec)
-
-    def _parse_copy_options(self, sql: str, context: CopyIntoContext) -> None:
-        """Parse COPY INTO options like ON_ERROR, FORCE, etc."""
-        # ON_ERROR option
-        on_error_pattern = r'ON_ERROR\s*=\s*[\'"](\w+)[\'"]'
-        on_error_match = re.search(on_error_pattern, sql, re.IGNORECASE)
-        if on_error_match:
-            context.on_error = on_error_match.group(1).upper()
-
-        # FORCE option
-        if re.search(r"\bFORCE\s*=\s*TRUE\b", sql, re.IGNORECASE):
-            context.force = True
-
-        # PURGE option
-        if re.search(r"\bPURGE\s*=\s*TRUE\b", sql, re.IGNORECASE):
-            context.purge = True
-
-        # PATTERN option
-        pattern_match = re.search(r'PATTERN\s*=\s*[\'"]([^\'\"]+)[\'"]', sql, re.IGNORECASE)
-        if pattern_match:
-            context.pattern = pattern_match.group(1)
-
-        # VALIDATION_MODE option
-        validation_match = re.search(r'VALIDATION_MODE\s*=\s*[\'"](\w+)[\'"]', sql, re.IGNORECASE)
-        if validation_match:
-            context.validation_mode = validation_match.group(1).upper()
 
     def translate_copy_into(self, sql: str) -> str:
         """Translate a COPY INTO statement to DuckDB COPY statement."""

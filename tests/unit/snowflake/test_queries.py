@@ -12,7 +12,7 @@ class TestSnowflakeQueries:
     def executor(self):
         """Create an executor with sample data."""
         # Use in-memory history database for tests to avoid locking issues
-        executor = MockhausExecutor(enable_history=True, history_db_path=":memory:")
+        executor = MockhausExecutor()
         executor.connect()
         executor.create_sample_data()
         return executor
@@ -151,7 +151,7 @@ class TestTranslationDetails:
 
     def test_case_insensitive_keywords(self):
         """Test that case-insensitive SQL keywords work."""
-        executor = MockhausExecutor(enable_history=True, history_db_path=":memory:")
+        executor = MockhausExecutor()
         executor.connect()
         executor.create_sample_data()
 
@@ -165,7 +165,7 @@ class TestTranslationDetails:
 
     def test_translation_info(self):
         """Test that translation information is captured."""
-        executor = MockhausExecutor(enable_history=True, history_db_path=":memory:")
+        executor = MockhausExecutor()
         executor.connect()
         executor.create_sample_data()
 
@@ -180,7 +180,7 @@ class TestTranslationDetails:
 
     def test_error_handling(self):
         """Test error handling for invalid SQL."""
-        executor = MockhausExecutor(enable_history=True, history_db_path=":memory:")
+        executor = MockhausExecutor()
         executor.connect()
 
         # Invalid SQL

@@ -4,7 +4,6 @@ import json
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import duckdb
@@ -77,51 +76,60 @@ class QueryStatistics:
 
 
 class QueryHistory:
-    """Manages query history storage and retrieval using DuckDB."""
+    """Manages query history storage and retrieval using DuckDB tables."""
 
     SCHEMA_NAME = "__mockhaus__"
 
-    def __init__(self, history_db_path: str | None = None):
+    def __init__(self, connection: duckdb.DuckDBPyConnection | None = None):
         """
         Initialize query history.
 
         Args:
-            history_db_path: Path to history database. If None, uses default location.
+            connection: DuckDB connection to use. If None, will be set later.
         """
-        if history_db_path is None:
-            # Default to ~/.mockhaus/history.duckdb
-            history_dir = Path.home() / ".mockhaus"
-            history_dir.mkdir(exist_ok=True)
-            history_db_path = str(history_dir / "history.duckdb")
+        self._connection = connection
+        self._initialized = False
+        self._is_memory_db = False
 
-        self.db_path = history_db_path
-        self._connection: duckdb.DuckDBPyConnection | None = None
-        self._write_queue: list[dict[str, Any]] = []
-        # Skip asyncio lock for now - not needed for current implementation
-        self._write_lock = None
-
-    def connect(self) -> None:
-        """Connect to the history database and initialize schema."""
+    def connect(self, connection: duckdb.DuckDBPyConnection) -> None:
+        """Set the connection and initialize schema if needed."""
         if self._connection is None:
-            self._connection = duckdb.connect(self.db_path)
+            self._connection = connection
+            # Check if this is an in-memory database by checking available catalogs
+            try:
+                catalogs = connection.execute("SELECT catalog_name FROM information_schema.schemata").fetchall()
+                catalog_names = {row[0] for row in catalogs}
+                self._is_memory_db = "memory" in catalog_names
+            except Exception:
+                self._is_memory_db = False
+        if not self._initialized:
             self._init_schema()
+            self._initialized = True
+
+    def _get_schema_name(self) -> str:
+        """Get the full schema name based on database type."""
+        if self._is_memory_db:
+            return f"memory.{self.SCHEMA_NAME}"
+        return self.SCHEMA_NAME
 
     def _init_schema(self) -> None:
         """Initialize the history schema and tables."""
         if not self._connection:
             raise RuntimeError("Not connected to history database")
 
+        schema_name = self._get_schema_name()
+
         # Create schema
-        self._connection.execute(f"CREATE SCHEMA IF NOT EXISTS {self.SCHEMA_NAME}")
+        self._connection.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
 
         # Create sequence for query_history ID
         self._connection.execute(f"""
-            CREATE SEQUENCE IF NOT EXISTS {self.SCHEMA_NAME}.query_history_id_seq
+            CREATE SEQUENCE IF NOT EXISTS {schema_name}.query_history_id_seq
         """)
 
         # Create query_history table
         self._connection.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.SCHEMA_NAME}.query_history (
+            CREATE TABLE IF NOT EXISTS {schema_name}.query_history (
                 id BIGINT PRIMARY KEY,
                 query_id VARCHAR NOT NULL,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -154,7 +162,7 @@ class QueryHistory:
 
         # Create query_metrics table
         self._connection.execute(f"""
-            CREATE TABLE IF NOT EXISTS {self.SCHEMA_NAME}.query_metrics (
+            CREATE TABLE IF NOT EXISTS {schema_name}.query_metrics (
                 query_id VARCHAR PRIMARY KEY,
                 parse_time_ms INTEGER,
                 translation_time_ms INTEGER,
@@ -167,21 +175,21 @@ class QueryHistory:
 
         # Create useful views
         self._connection.execute(f"""
-            CREATE OR REPLACE VIEW {self.SCHEMA_NAME}.recent_queries AS
-            SELECT * FROM {self.SCHEMA_NAME}.query_history
+            CREATE OR REPLACE VIEW {schema_name}.recent_queries AS
+            SELECT * FROM {schema_name}.query_history
             ORDER BY timestamp DESC
             LIMIT 1000
         """)
 
         self._connection.execute(f"""
-            CREATE OR REPLACE VIEW {self.SCHEMA_NAME}.query_performance AS
+            CREATE OR REPLACE VIEW {schema_name}.query_performance AS
             SELECT
                 h.*,
                 m.parse_time_ms,
                 m.translation_time_ms,
                 m.total_time_ms
-            FROM {self.SCHEMA_NAME}.query_history h
-            LEFT JOIN {self.SCHEMA_NAME}.query_metrics m ON h.query_id = m.query_id
+            FROM {schema_name}.query_history h
+            LEFT JOIN {schema_name}.query_metrics m ON h.query_id = m.query_id
         """)
 
     def record_query(
@@ -201,7 +209,7 @@ class QueryHistory:
             The query_id of the recorded query.
         """
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         query_id = str(uuid.uuid4())
         query_type = self._extract_query_type(original_sql)
@@ -237,12 +245,13 @@ class QueryHistory:
     def record_metrics(self, metrics: QueryMetrics) -> None:
         """Record performance metrics for a query."""
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         self._connection.execute(
             f"""
-            INSERT INTO {self.SCHEMA_NAME}.query_metrics
+            INSERT INTO {schema_name}.query_metrics
             (query_id, parse_time_ms, translation_time_ms, execution_time_ms,
              total_time_ms, memory_usage_bytes, cpu_usage_percent)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -261,12 +270,13 @@ class QueryHistory:
     def get_recent(self, limit: int = 100) -> list[QueryRecord]:
         """Get recent queries."""
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         result = self._connection.execute(
             f"""
-            SELECT * FROM {self.SCHEMA_NAME}.recent_queries
+            SELECT * FROM {schema_name}.recent_queries
             LIMIT ?
         """,
             [limit],
@@ -286,9 +296,10 @@ class QueryHistory:
     ) -> list[QueryRecord]:
         """Search query history with filters."""
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         conditions = []
         params: list[Any] = []
 
@@ -320,7 +331,7 @@ class QueryHistory:
 
         result = self._connection.execute(
             f"""
-            SELECT * FROM {self.SCHEMA_NAME}.query_history
+            SELECT * FROM {schema_name}.query_history
             WHERE {where_clause}
             ORDER BY timestamp DESC
             LIMIT ?
@@ -333,12 +344,13 @@ class QueryHistory:
     def get_by_id(self, query_id: str) -> QueryRecord | None:
         """Get a specific query by ID."""
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         result = self._connection.execute(
             f"""
-            SELECT * FROM {self.SCHEMA_NAME}.query_history
+            SELECT * FROM {schema_name}.query_history
             WHERE query_id = ?
         """,
             [query_id],
@@ -349,9 +361,10 @@ class QueryHistory:
     def get_statistics(self, start_time: datetime, end_time: datetime) -> QueryStatistics:
         """Get query statistics for a time period."""
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         # Get basic stats
         stats = self._connection.execute(
             f"""
@@ -361,7 +374,7 @@ class QueryHistory:
                 COUNT(CASE WHEN status != 'SUCCESS' THEN 1 END) as failed_queries,
                 AVG(execution_time_ms) as avg_execution_time_ms,
                 PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY execution_time_ms) as p95_execution_time_ms
-            FROM {self.SCHEMA_NAME}.query_history
+            FROM {schema_name}.query_history
             WHERE timestamp BETWEEN ? AND ?
         """,
             [start_time, end_time],
@@ -371,7 +384,7 @@ class QueryHistory:
         by_type = self._connection.execute(
             f"""
             SELECT query_type, COUNT(*) as count
-            FROM {self.SCHEMA_NAME}.query_history
+            FROM {schema_name}.query_history
             WHERE timestamp BETWEEN ? AND ?
             GROUP BY query_type
         """,
@@ -384,7 +397,7 @@ class QueryHistory:
         by_error = self._connection.execute(
             f"""
             SELECT error_code, COUNT(*) as count
-            FROM {self.SCHEMA_NAME}.query_history
+            FROM {schema_name}.query_history
             WHERE timestamp BETWEEN ? AND ? AND error_code IS NOT NULL
             GROUP BY error_code
         """,
@@ -399,7 +412,7 @@ class QueryHistory:
             SELECT
                 DATE_TRUNC('hour', timestamp) as hour,
                 COUNT(*) as count
-            FROM {self.SCHEMA_NAME}.query_history
+            FROM {schema_name}.query_history
             WHERE timestamp BETWEEN ? AND ?
             GROUP BY hour
             ORDER BY hour
@@ -443,14 +456,15 @@ class QueryHistory:
             Number of records deleted.
         """
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         # First count how many records will be deleted
         if before_date:
             count_result = self._connection.execute(
                 f"""
-                SELECT COUNT(*) FROM {self.SCHEMA_NAME}.query_history
+                SELECT COUNT(*) FROM {schema_name}.query_history
                 WHERE timestamp < ?
             """,
                 [before_date.isoformat()],
@@ -458,25 +472,25 @@ class QueryHistory:
 
             self._connection.execute(
                 f"""
-                DELETE FROM {self.SCHEMA_NAME}.query_history
+                DELETE FROM {schema_name}.query_history
                 WHERE timestamp < ?
             """,
                 [before_date.isoformat()],
             )
         else:
             count_result = self._connection.execute(f"""
-                SELECT COUNT(*) FROM {self.SCHEMA_NAME}.query_history
+                SELECT COUNT(*) FROM {schema_name}.query_history
             """).fetchone()
 
             self._connection.execute(f"""
-                DELETE FROM {self.SCHEMA_NAME}.query_history
+                DELETE FROM {schema_name}.query_history
             """)
 
         # Also clean up orphaned metrics
         self._connection.execute(f"""
-            DELETE FROM {self.SCHEMA_NAME}.query_metrics
+            DELETE FROM {schema_name}.query_metrics
             WHERE query_id NOT IN (
-                SELECT query_id FROM {self.SCHEMA_NAME}.query_history
+                SELECT query_id FROM {schema_name}.query_history
             )
         """)
 
@@ -492,23 +506,23 @@ class QueryHistory:
     def export_csv(self, output_path: str, columns: list[str] | None = None) -> None:
         """Export query history to CSV."""
         if not self._connection:
-            self.connect()
+            raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
         columns_str = ", ".join(columns) if columns else "*"
 
         self._connection.execute(f"""
             COPY (
-                SELECT {columns_str} FROM {self.SCHEMA_NAME}.query_history
+                SELECT {columns_str} FROM {schema_name}.query_history
                 ORDER BY timestamp DESC
             ) TO '{output_path}' (FORMAT CSV, HEADER)
         """)
 
     def close(self) -> None:
-        """Close the connection to the history database."""
-        if self._connection:
-            self._connection.close()
-            self._connection = None
+        """Reset the history - connection is managed externally."""
+        self._connection = None
+        self._initialized = False
 
     def _extract_query_type(self, sql: str) -> str | None:
         """Extract the query type from SQL."""
@@ -521,17 +535,18 @@ class QueryHistory:
     def _insert_history_record(self, record: dict[str, Any]) -> None:
         """Insert a record into the history table."""
         assert self._connection is not None  # For mypy
+        schema_name = self._get_schema_name()
 
         # Remove 'id' from record since it's generated by sequence
         record = {k: v for k, v in record.items() if k != "id"}
 
         columns = ["id"] + list(record.keys())
-        placeholders = [f"nextval('{self.SCHEMA_NAME}.query_history_id_seq')"] + ["?" for _ in record]
+        placeholders = [f"nextval('{schema_name}.query_history_id_seq')"] + ["?" for _ in record]
         values = [record[col] for col in record]
 
         self._connection.execute(
             f"""
-            INSERT INTO {self.SCHEMA_NAME}.query_history ({", ".join(columns)})
+            INSERT INTO {schema_name}.query_history ({", ".join(columns)})
             VALUES ({", ".join(placeholders)})
         """,
             values,

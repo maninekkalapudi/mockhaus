@@ -13,7 +13,7 @@ class TestDataIngestion(unittest.TestCase):
     def setUp(self) -> None:
         """Set up test environment."""
         # Use in-memory history database for tests to avoid locking issues
-        self.executor = MockhausExecutor(enable_history=True, history_db_path=":memory:")
+        self.executor = MockhausExecutor()
         self.executor.connect()
 
         # Create test directories

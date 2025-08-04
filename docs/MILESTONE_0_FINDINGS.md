@@ -197,11 +197,10 @@ For reference, typical Snowflake query times:
 ## User Feedback Preparation
 
 ### Demo Script
-1. Show sample queries: `mockhaus sample`
-2. Run basic SELECT: `mockhaus query "SELECT * FROM sample_customers"`
-3. Show translation: `mockhaus query "..." --verbose`
-4. Test complex query: aggregates with WHERE and ORDER BY
-5. Show error handling with invalid SQL
+1. Start the server: `mockhaus serve`
+2. Use the REPL or API to execute queries
+3. Test complex query: aggregates with WHERE and ORDER BY
+4. Show error handling with invalid SQL
 
 ### Questions to Ask Beta Users
 1. What SQL patterns do you use most frequently?

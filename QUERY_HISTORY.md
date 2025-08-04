@@ -1,311 +1,167 @@
 # Query History Documentation
 
-Mockhaus automatically tracks and stores the history of all SQL queries you execute. This comprehensive audit trail helps with debugging, performance analysis, and understanding query patterns.
+Mockhaus tracks the history of SQL queries executed during a server session. This helps with debugging, performance analysis, and understanding query patterns.
 
 ## Overview
 
-Query history captures detailed information about every SQL query including:
+Query history captures:
 - Original SQL text and any translations performed
 - Execution time and performance metrics
 - Success/failure status and error details
 - Timestamp and session context
-- Database and user information
+
+**Important:** Query history is stored in-memory and only available during an active server session. When the server restarts, all history is lost.
 
 ## Getting Started
 
 ### Automatic History Tracking
 
-Query history is **enabled by default** and works automatically when you:
-- Use the Mockhaus REPL (`python -m mockhaus.repl.enhanced_repl`)
-- Execute queries via the CLI (`python -m mockhaus.cli query "SELECT 1"`)
-- Use the Mockhaus server API
-
-No setup required - just start using Mockhaus and your queries will be tracked!
-
-### History Storage Location
-
-Query history is stored in: `~/.mockhaus/history.duckdb`
-
-This is separate from your application databases and won't interfere with your data.
-
-## Viewing Query History
-
-### Recent Queries
-
-View your most recent queries:
+Query history is automatically enabled when you run the Mockhaus server:
 
 ```bash
-# Show last 10 queries
-mockhaus history recent
+# Start the server
+uv run mockhaus serve
 
-# Show last 20 queries with full SQL text
-mockhaus history recent -n 20 --verbose
+# History is now being tracked for all queries executed through the server
 ```
 
-### Search Queries
+### Accessing History
 
-Find specific queries using powerful search filters:
+Query history can be accessed in two ways:
 
+1. **Through the REPL** (connected to the running server):
 ```bash
-# Search for queries containing "SELECT"
-mockhaus history search --text "SELECT"
+# Connect to the running server
+uv run python -m mockhaus.repl.enhanced_repl
 
-# Find failed queries from the last 3 days
-mockhaus history search --status ERROR --days 3
-
-# Search for INSERT queries in the last week
-mockhaus history search --type INSERT --days 7
-
-# Combine filters: find SELECT queries with "users" in last 24 hours
-mockhaus history search --text "users" --type SELECT --days 1
-```
-
-### Query Details
-
-Get detailed information about a specific query:
-
-```bash
-# Show full details for a query (use ID from recent/search results)
-mockhaus history show abc123-def456-789
-```
-
-This shows:
-- Complete SQL text (original and translated)
-- Execution timing and performance
-- Error messages (if failed)
-- Session context and metadata
-
-## Performance Analytics
-
-### Query Statistics
-
-Get insights into your query patterns and performance:
-
-```bash
-# Statistics for today
-mockhaus history stats
-
-# Statistics for the last week
-mockhaus history stats --days 7
-
-# Statistics for the last month  
-mockhaus history stats --days 30
-```
-
-Statistics include:
-- Total queries executed
-- Success/failure rates
-- Average and 95th percentile execution times
-- Breakdown by query type (SELECT, INSERT, etc.)
-- Error patterns and frequency
-
-## Managing History
-
-### Clearing Old Queries
-
-Remove old queries to save space:
-
-```bash
-# Clear all queries older than 30 days
-mockhaus history clear --before 2024-01-01
-
-# Clear ALL query history (with confirmation)
-mockhaus history clear
-
-# Skip confirmation prompt
-mockhaus history clear --force
-```
-
-### Exporting History
-
-Export your query history for analysis:
-
-```bash
-# Export last 7 days to JSON
-mockhaus history export --format json --output queries.json --days 7
-
-# Export all history to CSV
-mockhaus history export --format csv --output all_queries.csv
-```
-
-## Configuration
-
-### Basic Settings
-
-Create `mockhaus.config.json` in your project or home directory:
-
-```json
-{
-  "history": {
-    "enabled": true,
-    "retention_days": 30,
-    "max_size_mb": 1000
-  }
-}
-```
-
-### Environment Variables
-
-Control history via environment variables:
-
-```bash
-# Enable/disable history tracking
-export MOCKHAUS_HISTORY_ENABLED=true
-
-# Set custom history database location
-export MOCKHAUS_HISTORY_DB_PATH="/path/to/my/history.db"
-
-# Set retention period (days)
-export MOCKHAUS_HISTORY_RETENTION_DAYS=60
-```
-
-
-## Advanced Usage
-
-### Direct Database Access
-
-You can query the history database directly if needed:
-
-```sql
--- In REPL, attach the history database
-ATTACH '~/.mockhaus/history.duckdb' AS history_db;
-
--- Query your history directly
+# Query the history table directly
 SELECT original_sql, status, execution_time_ms, timestamp 
-FROM history_db.__mockhaus__.query_history 
+FROM __mockhaus__.query_history 
 ORDER BY timestamp DESC 
 LIMIT 10;
 ```
 
-### Integration with Tools
-
-The history data can be integrated with monitoring tools:
-
+2. **Through SQL queries** via the server API:
 ```bash
-# Get recent errors for alerting
-mockhaus history search --status ERROR --days 1 --limit 5
-
-# Export performance data for dashboards
-mockhaus history export --format json --days 7
+# Execute a query to view history
+curl -X POST http://localhost:8080/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT * FROM __mockhaus__.query_history ORDER BY timestamp DESC LIMIT 5"}'
 ```
 
-## Common Use Cases
+## Query History Schema
 
-### Debugging Failed Queries
+The `__mockhaus__.query_history` table contains:
 
-When a query fails, find and examine it:
+| Column | Type | Description |
+|--------|------|-------------|
+| query_id | VARCHAR | Unique identifier for the query |
+| original_sql | TEXT | The original Snowflake SQL query |
+| translated_sql | TEXT | The translated DuckDB SQL (if different) |
+| status | VARCHAR | SUCCESS or ERROR |
+| error_message | TEXT | Error details (if failed) |
+| execution_time_ms | FLOAT | Query execution time in milliseconds |
+| row_count | INTEGER | Number of rows returned |
+| timestamp | TIMESTAMP | When the query was executed |
+| session_id | VARCHAR | Server session identifier |
+| database_name | VARCHAR | Database context |
+| user_id | VARCHAR | User identifier (if available) |
 
-```bash
-# Find recent failed queries
-mockhaus history search --status ERROR --days 1
+## Common Queries
 
-# Get full details including error message
-mockhaus history show <query-id>
+### Recent Queries
+```sql
+-- Last 10 queries
+SELECT query_id, original_sql, status, execution_time_ms, timestamp
+FROM __mockhaus__.query_history
+ORDER BY timestamp DESC
+LIMIT 10;
+```
+
+### Failed Queries
+```sql
+-- Recent errors
+SELECT timestamp, original_sql, error_message
+FROM __mockhaus__.query_history
+WHERE status = 'ERROR'
+ORDER BY timestamp DESC
+LIMIT 5;
 ```
 
 ### Performance Analysis
+```sql
+-- Slowest queries
+SELECT original_sql, execution_time_ms, row_count
+FROM __mockhaus__.query_history
+WHERE status = 'SUCCESS'
+ORDER BY execution_time_ms DESC
+LIMIT 10;
 
-Identify slow queries and patterns:
-
-```bash
-# Get performance overview
-mockhaus history stats --days 7
-
-# Find long-running queries (exported data shows execution times)
-mockhaus history export --format json --days 7
+-- Query statistics
+SELECT 
+    COUNT(*) as total_queries,
+    COUNT(CASE WHEN status = 'SUCCESS' THEN 1 END) as successful,
+    COUNT(CASE WHEN status = 'ERROR' THEN 1 END) as failed,
+    AVG(execution_time_ms) as avg_time_ms,
+    MAX(execution_time_ms) as max_time_ms
+FROM __mockhaus__.query_history;
 ```
 
-### Audit and Compliance
-
-Track all database activity:
-
-```bash
-# Export complete audit trail
-mockhaus history export --format csv --output audit_trail.csv
-
-# Search for specific table access
-mockhaus history search --text "users_table" --days 30
+### Search by Pattern
+```sql
+-- Find queries on specific table
+SELECT query_id, original_sql, timestamp
+FROM __mockhaus__.query_history
+WHERE LOWER(original_sql) LIKE '%customers%'
+ORDER BY timestamp DESC;
 ```
 
-### Development Workflow
+## Session Lifecycle
 
-Review and replay queries during development:
-
-```bash
-# See what queries you ran today
-mockhaus history recent --verbose
-
-# Find that complex query you wrote yesterday
-mockhaus history search --text "JOIN" --days 2
-```
-
-## Troubleshooting
-
-### History Not Working
-
-If queries aren't being tracked:
-
-1. Check if history is enabled:
-   ```bash
-   # Should show recent queries
-   mockhaus history recent
-   ```
-
-2. Verify configuration:
-   ```bash
-   # Check environment variables
-   echo $MOCKHAUS_HISTORY_ENABLED
-   ```
-
-3. Check permissions on history directory:
-   ```bash
-   ls -la ~/.mockhaus/
-   ```
-
-### Performance Impact
-
-Query history has minimal performance impact:
-- Adds ~1-2ms per query
-- Uses separate database connection
-- Asynchronous writing (configurable)
-
-### Storage Management
-
-Monitor history database size:
-
-```bash
-# Check size
-du -h ~/.mockhaus/history.duckdb
-
-# Clear old entries if needed
-mockhaus history clear --before $(date -d '30 days ago' +%Y-%m-%d)
-```
+1. **Server Start**: A new in-memory database is created with an empty history table
+2. **Query Execution**: Each query through the server is automatically logged
+3. **Session Duration**: History accumulates as long as the server runs
+4. **Server Stop/Restart**: All history is lost when the server stops
 
 ## Best Practices
 
-1. **Regular Cleanup**: Set up periodic cleanup of old queries
-2. **Export Important Data**: Export critical query history before cleanup
-3. **Monitor Size**: Keep an eye on history database size
-4. **Use Search**: Leverage search filters to find queries quickly
-5. **Privacy**: Configure exclusion patterns for sensitive queries
+1. **Export Important Queries**: If you need to preserve query history, export it before stopping the server:
+   ```sql
+   -- Export to CSV format
+   COPY (SELECT * FROM __mockhaus__.query_history) 
+   TO 'query_history_export.csv' (FORMAT CSV, HEADER);
+   ```
 
-## Frequently Asked Questions
+2. **Monitor Long Sessions**: For long-running server sessions, periodically check the size of the history table
 
-**Q: Does query history slow down my queries?**
-A: No, history tracking adds minimal overhead (~1-2ms) and doesn't block query execution.
+3. **Use for Debugging**: Query history is excellent for debugging failed queries and understanding performance patterns
 
-**Q: Can I disable history for specific queries?**
-A: Not per-query, but you can disable it entirely or use exclusion patterns for sensitive queries.
+## Limitations
 
-**Q: Where is the history stored?**
-A: In `~/.mockhaus/history.duckdb`, separate from your application databases.
+- **No Persistence**: History is lost on server restart
+- **Memory Usage**: Very long sessions may accumulate significant history
+- **CLI Mode**: History is not useful in CLI mode as each command is isolated
+- **No Configuration**: History tracking cannot be disabled or configured
 
-**Q: Can I see history from the REPL?**
-A: Use the CLI commands (`mockhaus history recent`) or attach the history database in your REPL session.
+## Example Session
 
-**Q: How do I backup my query history?**
-A: Copy the `~/.mockhaus/history.duckdb` file or use `mockhaus history export`.
+```bash
+# Terminal 1: Start the server
+$ uv run mockhaus serve
+Starting Mockhaus server at http://localhost:8080
+⚠️  Server running in IN-MEMORY mode - all data is ephemeral
+
+# Terminal 2: Connect REPL and run queries
+$ uv run python -m mockhaus.repl.enhanced_repl
+mockhaus> SELECT COUNT(*) FROM sample_customers;
+mockhaus> SELECT * FROM sample_customers WHERE account_balance > 1000;
+
+# Check history
+mockhaus> SELECT query_id, original_sql, execution_time_ms 
+         FROM __mockhaus__.query_history 
+         ORDER BY timestamp DESC;
+```
 
 ---
 
-For technical details about the query history system, see the developer documentation.
+For more information about the Mockhaus architecture, see the main [README](README.md).

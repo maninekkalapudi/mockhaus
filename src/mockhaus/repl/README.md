@@ -22,7 +22,7 @@ Interactive command-line client for executing SQL queries against Mockhaus serve
 
 3. **Run the REPL client:**
    ```bash
-   python client/repl.py
+   uv run mockhaus repl
    ```
 
 ### Features
@@ -46,7 +46,7 @@ Interactive command-line client for executing SQL queries against Mockhaus serve
 Set custom server URL via environment variable:
 ```bash
 export MOCKHAUS_SERVER_URL=http://localhost:8081
-python client/repl.py
+uv run mockhaus repl
 ```
 
 ### Example Session
