@@ -21,8 +21,6 @@ def main() -> None:
     pass
 
 
-
-
 @main.command()
 @click.option("--host", default="localhost", help="Host to bind server")
 @click.option("--port", default=8080, type=int, help="Port to bind server")
@@ -49,8 +47,6 @@ def serve(host: str, port: int, database: str | None, daemon: bool) -> None:  # 
         console.print("\n[yellow]Server stopped[/yellow]")
 
 
-
-
 @main.command()
 def repl() -> None:
     """Start interactive REPL client."""
@@ -64,10 +60,6 @@ def repl() -> None:
         console.print("[dim]Make sure all dependencies are installed with: uv sync[/dim]")
     except KeyboardInterrupt:
         console.print("\n[yellow]REPL interrupted[/yellow]")
-
-
-
-
 
 
 @main.group()
@@ -359,10 +351,6 @@ def history_export(format: str, output: str, days: int) -> None:
         console.print(f"[red]Error exporting history: {e}[/red]")
     finally:
         history.close()
-
-
-
-
 
 
 if __name__ == "__main__":
