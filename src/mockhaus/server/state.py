@@ -1,57 +1,53 @@
-"""Global server state management for persistent connections."""
+"""Global server state management for session-based architecture."""
 
-from collections.abc import Generator
-from contextlib import contextmanager
+import os
 
-from ..executor import MockhausExecutor
+from .concurrent_session_manager import ConcurrentSessionManager
+from .session_context import SessionContext
 
 
 class ServerState:
-    """Manages global server state including persistent database connections."""
+    """Manages global server state for session-based architecture."""
 
     def __init__(self) -> None:
-        self._executor: MockhausExecutor | None = None
         self._initialized = False
+        self._session_manager: ConcurrentSessionManager | None = None
 
-    def get_executor(self) -> MockhausExecutor:
-        """Get or create the global executor instance."""
-        if not self._initialized:
-            self._initialize()
+    async def _initialize(self) -> None:
+        """Initialize the session manager."""
+        # Load configuration from environment variables
+        max_sessions = int(os.environ.get("MOCKHAUS_MAX_SESSIONS", "100"))
+        default_ttl = int(os.environ.get("MOCKHAUS_SESSION_TTL", "3600"))
+        cleanup_interval = int(os.environ.get("MOCKHAUS_CLEANUP_INTERVAL", "300"))
 
-        if self._executor is None:
-            raise RuntimeError("Server executor not initialized")
-
-        return self._executor
-
-    def _initialize(self) -> None:
-        """Initialize the global executor for server mode."""
-        # Create persistent executor
-        self._executor = MockhausExecutor()
-        self._executor.connect()
-
-        # Create sample data in main database
-        self._executor.create_sample_data()
+        self._session_manager = ConcurrentSessionManager(max_sessions=max_sessions, default_ttl=default_ttl, cleanup_interval=cleanup_interval)
+        # Start the session manager (starts background cleanup)
+        await self._session_manager.start()
 
         self._initialized = True
 
-    def shutdown(self) -> None:
+    async def get_session_manager(self) -> ConcurrentSessionManager:
+        """Get the session manager."""
+        if not self._initialized:
+            await self._initialize()
+
+        if not self._session_manager:
+            raise RuntimeError("Session manager not initialized")
+
+        return self._session_manager
+
+    async def get_or_create_session(self, session_id: str | None = None) -> SessionContext:
+        """Get or create a session context."""
+        session_manager = await self.get_session_manager()
+        return await session_manager.get_or_create_session(session_id)
+
+    async def shutdown(self) -> None:
         """Shutdown the server and cleanup resources."""
-        if self._executor:
-            self._executor.disconnect()
-            self._executor = None
+        if self._session_manager:
+            await self._session_manager.shutdown()
+            self._session_manager = None
         self._initialized = False
 
 
 # Global server state instance
 server_state = ServerState()
-
-
-@contextmanager
-def get_server_executor() -> Generator[MockhausExecutor, None, None]:
-    """Context manager to get the persistent server executor."""
-    executor = server_state.get_executor()
-    try:
-        yield executor
-    except Exception:
-        # Don't disconnect on error - keep connection alive
-        raise

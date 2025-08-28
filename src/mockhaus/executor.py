@@ -6,7 +6,7 @@ from typing import Any
 
 import duckdb
 
-from .logging import debug_log
+from .my_logging import debug_log
 from .query_history import QueryContext, QueryHistory, QueryMetrics
 from .snowflake import SnowflakeIngestionHandler, SnowflakeToDuckDBTranslator
 from .snowflake.database_manager import SnowflakeDatabaseManager
@@ -39,8 +39,8 @@ class MockhausExecutor:
         Args:
             query_context: Optional context information for query tracking.
         """
-        # Always use in-memory database
-        self.database_path = None
+        # Database path for persistent connections, None for in-memory
+        self.database_path: str | None = None
 
         self.translator = SnowflakeToDuckDBTranslator()
         self._connection: duckdb.DuckDBPyConnection | None = None
@@ -54,8 +54,9 @@ class MockhausExecutor:
     def connect(self) -> None:
         """Establish connection to DuckDB."""
         if self._connection is None:
-            # Always use in-memory database
-            self._connection = duckdb.connect(":memory:")
+            # Use database_path if set, otherwise in-memory
+            db_path = self.database_path if self.database_path else ":memory:"
+            self._connection = duckdb.connect(db_path)
             self._setup_database()
             self._setup_data_ingestion()
             self._setup_history()

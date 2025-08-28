@@ -65,8 +65,12 @@ class CSVFormatHandler(BaseFormatHandler):
         if record_delim:
             # Standard line endings - let DuckDB auto-detect (works better than specifying)
             standard_delimiters = {
-                "\\n", "\\r\\n", "\\r",  # Escaped versions
-                "\n", "\r\n", "\r"       # Literal versions
+                "\\n",
+                "\\r\\n",
+                "\\r",  # Escaped versions
+                "\n",
+                "\r\n",
+                "\r",  # Literal versions
             }
 
             if record_delim not in standard_delimiters:
@@ -168,13 +172,7 @@ class CSVFormatHandler(BaseFormatHandler):
             return
 
         # Native DuckDB encodings (no extension required)
-        native_encodings = {
-            "UTF-8": "UTF-8",
-            "UTF-16": "UTF-16",
-            "UTF-16BE": "UTF-16",
-            "UTF-16LE": "UTF-16",
-            "ISO-8859-1": "Latin-1"
-        }
+        native_encodings = {"UTF-8": "UTF-8", "UTF-16": "UTF-16", "UTF-16BE": "UTF-16", "UTF-16LE": "UTF-16", "ISO-8859-1": "Latin-1"}
 
         encoding_upper = encoding.upper()
         if encoding_upper in native_encodings:

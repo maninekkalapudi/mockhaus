@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..logging import debug_log
+from ..my_logging import debug_log
 from .ast_parser import SnowflakeASTParser
 from .file_formats import FileFormat, MockFileFormatManager
 from .stages import MockStageManager

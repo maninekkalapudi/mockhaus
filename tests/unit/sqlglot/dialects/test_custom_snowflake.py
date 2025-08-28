@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 import sqlglot
+from sqlglot import expressions
 
 from mockhaus.sqlglot.dialects import CustomSnowflake, IdentifierFunc, Sysdate
 
@@ -26,7 +27,7 @@ class TestCustomSnowflakeDialect:
 
     def test_sysdate_expression_type(self):
         """Test that Sysdate is properly defined as an expression."""
-        assert issubclass(Sysdate, sqlglot.expressions.Expression)
+        assert issubclass(Sysdate, expressions.Expression)
 
     def test_dialect_inheritance(self):
         """Test that CustomSnowflake properly inherits from Snowflake."""
@@ -59,7 +60,7 @@ class TestCustomSnowflakeDialect:
 
         # In table context, IDENTIFIER is parsed as Anonymous, not IdentifierFunc
         # This is expected due to different parsing paths for table names
-        anonymous_nodes = [n for n in parsed.find_all(sqlglot.expressions.Anonymous) if n.this.upper() == "IDENTIFIER"]
+        anonymous_nodes = [n for n in parsed.find_all(expressions.Anonymous) if n.this.upper() == "IDENTIFIER"]
         assert len(anonymous_nodes) == 1
         assert anonymous_nodes[0].this == "IDENTIFIER"
 
@@ -75,7 +76,7 @@ class TestCustomSnowflakeDialect:
 
     def test_identifier_expression_type(self):
         """Test that IdentifierFunc is properly defined as an expression."""
-        assert issubclass(IdentifierFunc, sqlglot.expressions.Expression)
+        assert issubclass(IdentifierFunc, expressions.Expression)
 
     def test_identifier_parser_registration(self):
         """Test that the custom parser includes IDENTIFIER function."""

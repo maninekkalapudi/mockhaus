@@ -35,10 +35,11 @@ def serve(host: str, port: int, database: str | None, daemon: bool) -> None:  # 
         return
 
     console.print(f"[green]Starting Mockhaus server at http://{host}:{port}[/green]")
-    console.print("[yellow]⚠️  Server running in IN-MEMORY mode - all data is ephemeral[/yellow]")
-    console.print("[dim]All databases will be lost when server stops[/dim]")
-    console.print("[dim]Query history will persist in ~/.mockhaus/history.duckdb[/dim]")
-    console.print(f"[dim]API documentation available at http://{host}:{port}/docs[/dim]")
+    console.print("[cyan]🔗 Session-based architecture - supports multiple concurrent users[/cyan]")
+    console.print("[dim]• Memory sessions: Data isolated per session, lost when session ends[/dim]")
+    console.print("[dim]• Persistent sessions: Data saved to disk, survives server restarts[/dim]")
+    console.print("[dim]• Query history: Per-session, in-memory only (not persisted)[/dim]")
+    console.print(f"[dim]• API documentation available at http://{host}:{port}/docs[/dim]")
     console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
 
     try:
@@ -48,13 +49,17 @@ def serve(host: str, port: int, database: str | None, daemon: bool) -> None:  # 
 
 
 @main.command()
-def repl() -> None:
+@click.option("--session-type", default="memory", type=click.Choice(["memory", "persistent"]), help="Session type")
+@click.option("--session-id", help="Specific session ID to use")
+@click.option("--session-ttl", type=int, help="Session TTL in seconds")
+@click.option("--persistent-path", help="Path for persistent session storage")
+def repl(session_type: str, session_id: str | None, session_ttl: int | None, persistent_path: str | None) -> None:
     """Start interactive REPL client."""
     try:
         # Import the enhanced REPL directly
         from .repl.enhanced_repl import main as enhanced_repl_main
 
-        enhanced_repl_main()
+        enhanced_repl_main(session_type=session_type, session_id=session_id, session_ttl=session_ttl, persistent_path=persistent_path)
     except ImportError as e:
         console.print(f"[red]Error: Enhanced REPL module not found: {e}[/red]")
         console.print("[dim]Make sure all dependencies are installed with: uv sync[/dim]")

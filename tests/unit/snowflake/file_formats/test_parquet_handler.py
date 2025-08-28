@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from src.mockhaus.snowflake.file_formats.parquet import ParquetFormatHandler
+from mockhaus.snowflake.file_formats.parquet import ParquetFormatHandler
 
 
 class TestParquetFormatHandler:

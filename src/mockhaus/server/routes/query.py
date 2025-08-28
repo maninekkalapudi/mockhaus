@@ -7,8 +7,9 @@ from fastapi import APIRouter, HTTPException
 
 from ..models.request import QueryRequest
 from ..models.response import ErrorResponse, QueryResponse
-from ..session import session_manager
-from ..state import get_server_executor
+
+# Legacy session manager removed - now using ConcurrentSessionManager only
+from ..state import server_state
 
 router = APIRouter(tags=["query"])
 
@@ -38,28 +39,32 @@ async def execute_query(request: QueryRequest) -> Any:
     try:
         session_id = request.session_id
 
-        # Create session if none provided
-        if session_id is None:
-            session_id = session_manager.create_session()
+        # Use session-based execution
+        session_context = await server_state.get_or_create_session(session_id)
 
-        # Use persistent server executor
-        with get_server_executor() as executor:
-            result = executor.execute_snowflake_sql(request.sql)
-            execution_time = time.time() - start_time
+        # Execute query in session context
+        result = await session_context.execute_sql(request.sql)
+        execution_time = time.time() - start_time
 
-            if result.success:
-                return QueryResponse(
-                    success=True,
-                    data=result.data,
-                    execution_time=execution_time,
-                    translated_sql=result.translated_sql,
-                    message=None,
-                    session_id=session_id,
-                    current_database=executor._database_manager.current_database if executor._database_manager else None,
-                )
-            raise HTTPException(
-                status_code=400, detail={"success": False, "error": "SQL_EXECUTION_ERROR", "detail": result.error, "session_id": session_id}
+        if result["success"]:
+            return QueryResponse(
+                success=True,
+                data=result["data"],
+                execution_time=execution_time,
+                translated_sql=result["translated_sql"],
+                message=None,
+                session_id=result["session_id"],
+                current_database=None,  # TODO: Add database tracking to session
             )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error": "SQL_EXECUTION_ERROR",
+                "detail": result.get("error", "Unknown error"),
+                "session_id": result["session_id"],
+            },
+        )
 
     except HTTPException:
         # Re-raise HTTP exceptions as-is

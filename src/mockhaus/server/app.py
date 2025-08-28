@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from .middleware.cors import add_cors_middleware
 from .middleware.debug_logging import add_debug_logging_middleware
 from .middleware.logging import add_logging_middleware
-from .routes import health, query
+from .routes import health, query, sessions
 from .state import server_state
 
 
@@ -19,7 +19,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup: initialize server state
     yield
     # Shutdown: cleanup server state
-    server_state.shutdown()
+    await server_state.shutdown()
 
 
 # Create FastAPI application
@@ -43,6 +43,7 @@ add_debug_logging_middleware(app, debug=debug_enabled)
 # Include routers
 app.include_router(query.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(sessions.router, prefix="/api/v1")
 
 
 @app.get("/")

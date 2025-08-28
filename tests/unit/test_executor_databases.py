@@ -1,39 +1,42 @@
-"""Test in-memory server functionality."""
+"""Test MockhausExecutor database-level operations."""
 
 from mockhaus.executor import MockhausExecutor
 
 
-class TestInMemoryServer:
-    """Test in-memory server mode functionality."""
+class TestMockhausExecutorDatabases:
+    """Test database-level DDL operations in MockhausExecutor."""
 
-    def test_server_mode_detection(self):
+    def test_executor_is_always_in_memory(self):
         """Test that executor is always in-memory mode."""
         # Executor is now always in-memory
         executor = MockhausExecutor()
         assert executor.database_path is None  # Always in-memory
 
-    def test_server_mode_forces_in_memory(self):
+    def test_executor_forces_in_memory_mode(self):
         """Test that executor is always in-memory regardless of parameters."""
         # Executor is always in-memory now, constructor doesn't accept database_path
         executor = MockhausExecutor()
         assert executor.database_path is None
 
-    def test_in_memory_database_operations(self):
-        """Test basic database operations in in-memory mode."""
+    def test_database_operations(self):
+        """Test basic database DDL operations (CREATE, USE, SHOW, DROP)."""
         with MockhausExecutor() as executor:
             # Test CREATE DATABASE
             result = executor.execute_snowflake_sql("CREATE DATABASE test_db")
             assert result.success
+            assert result.data is not None
             assert "created (in-memory)" in result.data[0]["message"]
 
             # Test USE DATABASE
             result = executor.execute_snowflake_sql("USE test_db")
             assert result.success
+            assert result.data is not None
             assert "Using database" in result.data[0]["message"]
 
             # Test SHOW DATABASES
             result = executor.execute_snowflake_sql("SHOW DATABASES")
             assert result.success
+            assert result.data is not None
             db_names = [db["name"] for db in result.data]
             assert "main" in db_names
             assert "test_db" in db_names
@@ -49,6 +52,7 @@ class TestInMemoryServer:
             # Test querying data
             result = executor.execute_snowflake_sql("SELECT * FROM users ORDER BY id")
             assert result.success
+            assert result.data is not None
             assert len(result.data) == 2
             assert result.data[0]["name"] == "Alice"
             assert result.data[1]["name"] == "Bob"
@@ -60,11 +64,12 @@ class TestInMemoryServer:
             # Verify database is gone
             result = executor.execute_snowflake_sql("SHOW DATABASES")
             assert result.success
+            assert result.data is not None
             db_names = [db["name"] for db in result.data]
             assert "test_db" not in db_names
 
     def test_cross_database_queries(self):
-        """Test queries across multiple in-memory databases."""
+        """Test queries across multiple databases."""
         with MockhausExecutor() as executor:
             # Create two databases
             executor.execute_snowflake_sql("CREATE DATABASE sales")
@@ -88,6 +93,7 @@ class TestInMemoryServer:
                 ORDER BY c.id
             """)
             assert result.success
+            assert result.data
             assert len(result.data) == 2
             assert result.data[0]["name"] == "Alice"
             assert float(result.data[0]["value"]) == 100.5
@@ -99,6 +105,7 @@ class TestInMemoryServer:
             executor.execute_snowflake_sql("CREATE DATABASE test_db")
             result = executor.execute_snowflake_sql("CREATE DATABASE test_db")
             assert not result.success
+            assert result.error is not None
             assert "already exists" in result.error
 
             # Test IF NOT EXISTS
@@ -108,6 +115,7 @@ class TestInMemoryServer:
             # Test dropping non-existent database
             result = executor.execute_snowflake_sql("DROP DATABASE non_existent")
             assert not result.success
+            assert result.error is not None
             assert "does not exist" in result.error
 
             # Test IF EXISTS
@@ -117,9 +125,11 @@ class TestInMemoryServer:
             # Test dropping main database
             result = executor.execute_snowflake_sql("DROP DATABASE main")
             assert not result.success
+            assert result.error is not None
             assert "Cannot drop main database" in result.error
 
             # Test using non-existent database
             result = executor.execute_snowflake_sql("USE non_existent")
             assert not result.success
+            assert result.error is not None
             assert "does not exist" in result.error

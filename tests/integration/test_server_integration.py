@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from mockhaus.server.app import app
-from mockhaus.server.state import server_state
 
 
 class TestServerIntegration:
@@ -30,14 +29,9 @@ class TestServerIntegration:
     @pytest.fixture(scope="class")
     def client(self, test_db_path: str) -> Generator[TestClient, None, None]:  # noqa: ARG002
         """Create a test client with the FastAPI app."""
-        # Reset server state for clean testing
-        server_state.shutdown()
-
+        # State cleanup is handled by conftest.py async fixture
         with TestClient(app) as test_client:
             yield test_client
-
-        # Cleanup after tests
-        server_state.shutdown()
 
     def test_root_endpoint(self, client: TestClient) -> None:
         """Test the root endpoint returns basic server information."""

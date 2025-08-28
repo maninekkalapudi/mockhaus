@@ -23,20 +23,61 @@ except ImportError:
 class EnhancedMockhausClient:
     """Enhanced HTTP client for Mockhaus server with advanced terminal features."""
 
-    def __init__(self, base_url: str = "http://localhost:8080"):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8080",
+        session_type: str = "memory",
+        session_id: str | None = None,
+        session_ttl: int | None = None,
+        persistent_path: str | None = None,
+    ):
         """
         Initialize client with enhanced terminal features.
 
         Args:
             base_url: Base URL of Mockhaus server
+            session_type: Type of session ("memory" or "persistent")
+            session_id: Specific session ID to use (optional)
+            session_ttl: Session TTL in seconds (optional)
+            persistent_path: Path for persistent session storage (optional)
         """
         self.base_url = base_url
         self.session = requests.Session()
-        self.session_id: str | None = None
+        self.session_id: str | None = session_id
+        self.session_type = session_type
+        self.session_ttl = session_ttl
+        self.persistent_path = persistent_path
         self.current_database: str | None = None
 
         if PROMPT_TOOLKIT_AVAILABLE:
             self._setup_enhanced_features()
+
+    def initialize_session(self) -> bool:
+        """
+        Initialize the session at startup.
+
+        Returns:
+            True if session was created/connected successfully
+        """
+        if self.session_id:
+            # Try to connect to existing session
+            session_info = self.get_session_info()
+            if session_info:
+                print(f"✅ Connected to existing session: {self.session_id[:8]}...")
+                return True
+            print(f"⚠️  Session {self.session_id[:8]}... not found, creating new session")
+            self.session_id = None  # Clear invalid session ID
+
+        # Create new session
+        session_result = self.create_session()
+        if session_result.get("success") and self.session_id:
+            print(f"✅ Created new {self.session_type} session: {self.session_id[:8]}...")
+            return True
+        error_msg = session_result.get("message", "Unknown error")
+        if "detail" in session_result and isinstance(session_result["detail"], dict):
+            error_msg = session_result["detail"].get("detail", error_msg)
+        print(f"❌ Failed to create session: {error_msg}")
+        return False
 
     def _setup_enhanced_features(self) -> None:
         """Setup enhanced terminal features when prompt_toolkit is available."""
@@ -136,6 +177,82 @@ class EnhancedMockhausClient:
             """Ctrl+L: Clear screen"""
             event.app.output.clear()
 
+    def create_session(self) -> dict[str, Any]:
+        """
+        Create a new session on the server.
+
+        Returns:
+            Session creation result dictionary
+        """
+        from typing import Any
+        payload: dict[str, Any] = {"type": self.session_type}
+
+        if self.session_ttl:
+            payload["ttl_seconds"] = self.session_ttl
+
+        if self.session_type == "persistent" and self.persistent_path:
+            payload["storage"] = {"type": "local", "path": self.persistent_path}
+
+        response = self.session.post(f"{self.base_url}/api/v1/sessions", json=payload)
+        result = response.json()
+
+        # Handle nested session structure from server
+        if result.get("success") and "session" in result:
+            session_data = result["session"]
+            if "session_id" in session_data:
+                self.session_id = session_data["session_id"]
+        elif "session_id" in result:  # Handle flat structure (fallback)
+            self.session_id = result["session_id"]
+
+        return cast(dict[str, Any], result)
+
+    def get_session_info(self) -> dict[str, Any] | None:
+        """
+        Get information about the current session.
+
+        Returns:
+            Session info dictionary or None if no session
+        """
+        if not self.session_id:
+            return None
+
+        response = self.session.get(f"{self.base_url}/api/v1/sessions/{self.session_id}")
+
+        if response.status_code == 404:
+            return None
+
+        result = response.json()
+        return cast(dict[str, Any], result)
+
+    def terminate_session(self) -> bool:
+        """
+        Terminate the current session on the server.
+
+        Returns:
+            True if session was terminated successfully
+        """
+        if not self.session_id:
+            return False
+
+        response = self.session.delete(f"{self.base_url}/api/v1/sessions/{self.session_id}")
+
+        if response.status_code == 200:
+            self.session_id = None
+            self.current_database = None
+            return True
+
+        return False
+
+    def list_sessions(self) -> dict[str, Any]:
+        """
+        List all active sessions on the server.
+
+        Returns:
+            Dictionary of session information
+        """
+        response = self.session.get(f"{self.base_url}/api/v1/sessions")
+        return cast(dict[str, Any], response.json())
+
     def query(self, sql: str, database: str | None = None) -> dict[str, Any]:
         """
         Execute SQL query against Mockhaus server.
@@ -147,16 +264,16 @@ class EnhancedMockhausClient:
         Returns:
             Query result dictionary
         """
-        payload = {"sql": sql, "database": database}
-        if self.session_id:
-            payload["session_id"] = self.session_id
+        if not self.session_id:
+            return {"success": False, "error": "No active session. Session should be created at startup."}
+
+        payload = {"sql": sql, "database": database, "session_id": self.session_id}
 
         response = self.session.post(f"{self.base_url}/api/v1/query", json=payload)
         result = response.json()
 
-        # Update session info from response
-        if result.get("success") and "session_id" in result:
-            self.session_id = result["session_id"]
+        # Update current database info from response (but not session_id)
+        if result.get("success") and "current_database" in result:
             self.current_database = result.get("current_database")
 
         return cast(dict[str, Any], result)
@@ -311,7 +428,9 @@ def print_help() -> None:
     print("Commands:")
     print("  help, ?          - Show this help")
     print("  health           - Check server health")
-    print("  quit, exit, q    - Exit REPL")
+    print("  session          - Show current session info")
+    print("  sessions         - List all active sessions")
+    print("  quit, exit, q    - Exit REPL (terminates session)")
     print()
     print("SQL Examples:")
     print("  SHOW DATABASES;")
@@ -371,7 +490,9 @@ def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | Non
     return " ".join(lines)
 
 
-def main() -> None:
+def main(
+    session_type: str = "memory", session_id: str | None = None, session_ttl: int | None = None, persistent_path: str | None = None
+) -> None:
     """Enhanced interactive REPL for Mockhaus."""
     # Print startup message with enhanced features status
     print("🏠 Mockhaus Interactive REPL")
@@ -384,11 +505,24 @@ def main() -> None:
         print("⚠️  Basic mode (prompt_toolkit not available)")
 
     print("   Type 'help' for commands, 'quit' or Ctrl+C to exit")
+
+    # Show session configuration
+    print()
+    print("📋 Session Configuration:")
+    print(f"   Type: {session_type}")
+    if session_id:
+        print(f"   ID: {session_id}")
+    if session_ttl:
+        print(f"   TTL: {session_ttl} seconds")
+    if persistent_path:
+        print(f"   Storage: {persistent_path}")
     print()
 
     # Allow custom server URL via environment variable
     server_url = os.getenv("MOCKHAUS_SERVER_URL", "http://localhost:8080")
-    client = EnhancedMockhausClient(server_url)
+    client = EnhancedMockhausClient(
+        base_url=server_url, session_type=session_type, session_id=session_id, session_ttl=session_ttl, persistent_path=persistent_path
+    )
 
     # Test connection
     try:
@@ -399,6 +533,12 @@ def main() -> None:
         print(f"❌ Cannot connect to Mockhaus server at {server_url}")
         print(f"   Error: {e}")
         print("   Please make sure the server is running with: python -m mockhaus.server")
+        return
+
+    # Initialize session
+    print("🔗 Initializing session...")
+    if not client.initialize_session():
+        print("❌ Failed to initialize session. Exiting.")
         return
 
     while True:
@@ -426,6 +566,43 @@ def main() -> None:
                 print(f"✅ Server health: {health_result}")
                 continue
 
+            if query.lower() == "session":
+                session_info = client.get_session_info()
+                if session_info and session_info.get("success") and "session" in session_info:
+                    session_data = session_info["session"]
+                    print("📋 Current Session Info:")
+                    print(f"   ID: {session_data.get('session_id', 'N/A')}")
+                    print(f"   Type: {session_data.get('type', 'N/A')}")
+                    print(f"   Created: {session_data.get('created_at', 'N/A')}")
+                    print(f"   Last Accessed: {session_data.get('last_accessed', 'N/A')}")
+                    print(f"   TTL: {session_data.get('ttl_seconds', 'N/A')} seconds")
+                    print(f"   Active: {session_data.get('is_active', 'N/A')}")
+                    if session_data.get("storage_config"):
+                        storage = session_data["storage_config"]
+                        print(f"   Storage: {storage.get('type', 'N/A')} at {storage.get('path', 'N/A')}")
+                else:
+                    print("❌ No active session")
+                continue
+
+            if query.lower() == "sessions":
+                sessions_result = client.list_sessions()
+                if sessions_result.get("success"):
+                    session_details = sessions_result.get("session_details", [])
+                    if session_details:
+                        print(f"📋 Active Sessions ({len(session_details)}):")
+                        for info in session_details:
+                            session_id = info.get("session_id", "unknown")
+                            session_type = info.get("type", "unknown")
+                            last_accessed = info.get("last_accessed", "N/A")
+                            # Ensure session_id is not None before slicing
+                            display_id = session_id[:8] + "..." if session_id and len(session_id) > 8 else session_id or "unknown"
+                            print(f"   {display_id} - {session_type} ({last_accessed})")
+                    else:
+                        print("📋 No active sessions")
+                else:
+                    print(f"❌ Failed to list sessions: {sessions_result.get('error', 'Unknown error')}")
+                continue
+
             # Execute SQL query
             result = client.query(query)
             print(format_results(result))
@@ -439,6 +616,17 @@ def main() -> None:
 
             traceback.print_exc()
             continue
+
+    # Clean up session when exiting
+    try:
+        if client.session_id:
+            print("🧹 Cleaning up session...")
+            if client.terminate_session():
+                print("✅ Session terminated")
+            else:
+                print("⚠️  Failed to terminate session")
+    except Exception as e:
+        print(f"⚠️  Error during cleanup: {e}")
 
 
 if __name__ == "__main__":

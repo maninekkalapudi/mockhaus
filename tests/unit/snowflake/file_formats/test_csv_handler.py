@@ -1,6 +1,6 @@
 """Unit tests for enhanced CSV format handler."""
 
-from src.mockhaus.snowflake.file_formats.csv import CSVFormatHandler
+from mockhaus.snowflake.file_formats.csv import CSVFormatHandler
 
 
 class TestCSVFormatHandler:
@@ -117,10 +117,7 @@ class TestCSVFormatHandler:
 
     def test_datetime_format_mapping(self):
         """Test date and timestamp format mapping."""
-        props = {
-            "DATE_FORMAT": "YYYY-MM-DD",
-            "TIMESTAMP_FORMAT": "YYYY-MM-DD HH24:MI:SS"
-        }
+        props = {"DATE_FORMAT": "YYYY-MM-DD", "TIMESTAMP_FORMAT": "YYYY-MM-DD HH24:MI:SS"}
         result = self.handler.map_to_duckdb_options(props)
 
         assert result.options["dateformat"] == "YYYY-MM-DD"
@@ -128,10 +125,7 @@ class TestCSVFormatHandler:
 
     def test_datetime_format_auto_ignored(self):
         """Test that AUTO date/timestamp formats are ignored."""
-        props = {
-            "DATE_FORMAT": "AUTO",
-            "TIMESTAMP_FORMAT": "AUTO"
-        }
+        props = {"DATE_FORMAT": "AUTO", "TIMESTAMP_FORMAT": "AUTO"}
         result = self.handler.map_to_duckdb_options(props)
 
         assert "dateformat" not in result.options
@@ -222,11 +216,11 @@ class TestCSVFormatHandler:
         props = {
             "TYPE": "CSV",
             "FIELD_DELIMITER": ",",
-            "BINARY_FORMAT": "HEX",              # Unsupported
-            "SKIP_BLANK_LINES": True,            # Unsupported
-            "VALIDATE_UTF8": False,              # Unsupported
-            "ESCAPE_UNENCLOSED_FIELD": "\\",     # Unsupported
-            "MULTI_LINE": True,                  # Unsupported (future feature)
+            "BINARY_FORMAT": "HEX",  # Unsupported
+            "SKIP_BLANK_LINES": True,  # Unsupported
+            "VALIDATE_UTF8": False,  # Unsupported
+            "ESCAPE_UNENCLOSED_FIELD": "\\",  # Unsupported
+            "MULTI_LINE": True,  # Unsupported (future feature)
         }
         result = self.handler.map_to_duckdb_options(props)
 
@@ -251,19 +245,11 @@ class TestCSVFormatHandler:
     def test_case_insensitive_properties(self):
         """Test that both uppercase and lowercase properties work."""
         # Test uppercase (Snowflake style)
-        props_upper = {
-            "FIELD_DELIMITER": "|",
-            "SKIP_HEADER": 1,
-            "COMPRESSION": "GZIP"
-        }
+        props_upper = {"FIELD_DELIMITER": "|", "SKIP_HEADER": 1, "COMPRESSION": "GZIP"}
         result_upper = self.handler.map_to_duckdb_options(props_upper)
 
         # Test lowercase (alternative style)
-        props_lower = {
-            "field_delimiter": "|",
-            "skip_header": 1,
-            "compression": "GZIP"
-        }
+        props_lower = {"field_delimiter": "|", "skip_header": 1, "compression": "GZIP"}
         result_lower = self.handler.map_to_duckdb_options(props_lower)
 
         # Results should be identical
@@ -317,7 +303,7 @@ class TestCSVFormatHandler:
         # Should have FORMAT and default values applied
         assert result.options["FORMAT"] == "CSV"
         assert result.options["compression"] == "auto"  # Default AUTO -> auto
-        assert result.options["encoding"] == "UTF-8"    # Default encoding
-        assert result.options["header"] is False        # Default skip_header = 0
+        assert result.options["encoding"] == "UTF-8"  # Default encoding
+        assert result.options["header"] is False  # Default skip_header = 0
         assert len(result.warnings) == 0
         assert len(result.ignored_options) == 0

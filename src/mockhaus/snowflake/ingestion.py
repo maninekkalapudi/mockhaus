@@ -4,7 +4,7 @@ from typing import Any
 
 import duckdb
 
-from ..logging import debug_log
+from ..my_logging import debug_log
 from .ast_parser import SnowflakeASTParser
 from .copy_into import CopyIntoTranslator
 from .file_formats import MockFileFormatManager

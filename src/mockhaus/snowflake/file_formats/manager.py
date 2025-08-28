@@ -76,7 +76,7 @@ class MockFileFormatManager:
             # Store mapping result metadata for debugging
             if result.warnings or result.ignored_options:
                 try:
-                    from mockhaus.logging import debug_log
+                    from mockhaus.my_logging import debug_log
 
                     debug_log(f"Format mapping for {file_format.name}: warnings={result.warnings}, ignored={result.ignored_options}")
                 except ImportError:

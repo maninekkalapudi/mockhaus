@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from mockhaus.server.app import app
-from mockhaus.server.state import server_state
 
 
 class TestSnowflakeFeatures:
@@ -29,12 +28,9 @@ class TestSnowflakeFeatures:
     @pytest.fixture(scope="class")
     def client(self, test_db_path: str) -> Generator[TestClient, None, None]:  # noqa: ARG002
         """Create a test client with the FastAPI app."""
-        server_state.shutdown()
-
+        # State cleanup is handled by conftest.py async fixture
         with TestClient(app) as test_client:
             yield test_client
-
-        server_state.shutdown()
 
     @pytest.fixture(scope="class")
     def session_id(self, client: TestClient) -> str:

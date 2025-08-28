@@ -7,9 +7,9 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from src.mockhaus.snowflake.copy_into import CopyIntoTranslator
-from src.mockhaus.snowflake.file_formats import MockFileFormatManager
-from src.mockhaus.snowflake.stages import MockStageManager
+from mockhaus.snowflake.copy_into import CopyIntoTranslator
+from mockhaus.snowflake.file_formats import MockFileFormatManager
+from mockhaus.snowflake.stages import MockStageManager
 
 
 class TestParquetCopyIntoReal:

@@ -24,13 +24,13 @@ def setup_test_environment():
 
 
 @pytest.fixture(autouse=True)
-def reset_state():
+async def reset_state():
     """Reset any global state before each test."""
     # Import here to avoid issues if modules aren't available
     try:
         from mockhaus.server.state import server_state
 
-        server_state.shutdown()
+        await server_state.shutdown()
     except ImportError:
         pass
 
@@ -40,7 +40,7 @@ def reset_state():
     try:
         from mockhaus.server.state import server_state
 
-        server_state.shutdown()
+        await server_state.shutdown()
     except ImportError:
         pass
 

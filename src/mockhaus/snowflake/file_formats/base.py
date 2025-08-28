@@ -63,7 +63,7 @@ class BaseFormatHandler(ABC):
             return
 
         try:
-            from mockhaus.logging import debug_log
+            from mockhaus.my_logging import debug_log
 
             for warning in warnings:
                 debug_log(f"{self.format_type} format warning: {warning}")

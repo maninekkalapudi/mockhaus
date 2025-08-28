@@ -36,7 +36,7 @@ lint:
 	@echo "Running mypy..."
 	@uv run mypy src/ || echo "mypy found issues"
 	@echo "Running pyright..."
-	@uv run pyright src/ || echo "pyright found issues"
+	@uv run pyright src/ tests/ || echo "pyright found issues"
 
 format:
 	uv run ruff format src/ tests/

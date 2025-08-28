@@ -5,7 +5,7 @@ from typing import Any
 import sqlglot
 from sqlglot import expressions as exp
 
-from mockhaus.logging import debug_log
+from mockhaus.my_logging import debug_log
 
 
 class SnowflakeASTParser:
