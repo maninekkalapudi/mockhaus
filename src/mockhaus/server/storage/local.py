@@ -138,6 +138,7 @@ class TempFileBackend(StorageBackend):
     def get_info(self) -> dict[str, Any]:
         """Get information about the storage backend."""
         from typing import Any
+
         info: dict[str, Any] = {
             "type": "temp",
             "temp_dir": str(self.temp_dir) if self.temp_dir else None,

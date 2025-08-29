@@ -1,0 +1,4 @@
+customer_id,name,email,signup_date,status,last_updated
+1002,Jane Smith Updated,jane.smith@example.com,2023-01-16,active,2023-02-01 14:20:00
+1003,Bob Johnson,bob@example.com,2023-01-17,active,2023-02-01 15:30:00
+1004,Alice Wilson,alice@example.com,2023-02-01,active,2023-02-01 16:00:00

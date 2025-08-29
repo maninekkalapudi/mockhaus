@@ -185,6 +185,7 @@ class EnhancedMockhausClient:
             Session creation result dictionary
         """
         from typing import Any
+
         payload: dict[str, Any] = {"type": self.session_type}
 
         if self.session_ttl:
@@ -490,9 +491,7 @@ def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | Non
     return " ".join(lines)
 
 
-def main(
-    session_type: str = "memory", session_id: str | None = None, session_ttl: int | None = None, persistent_path: str | None = None
-) -> None:
+def main(session_type: str = "memory", session_id: str | None = None, session_ttl: int | None = None, persistent_path: str | None = None) -> None:
     """Enhanced interactive REPL for Mockhaus."""
     # Print startup message with enhanced features status
     print("🏠 Mockhaus Interactive REPL")
