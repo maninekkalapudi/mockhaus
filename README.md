@@ -36,6 +36,23 @@ Mockhaus translates Snowflake SQL queries to DuckDB SQL and executes them locall
 
 ## Quick Start
 
+### Using Docker (Recommended)
+
+```bash
+# Build and start the server
+docker-compose up -d
+
+# Or build and run directly
+docker build -t mockhaus .
+docker run -p 8080:8080 -v $(pwd)/data:/app/data mockhaus
+
+# Connect with REPL (requires local installation)
+uv sync
+uv run mockhaus repl --server-url http://localhost:8080
+```
+
+### Local Development
+
 ```bash
 # Install dependencies
 uv sync
@@ -329,6 +346,62 @@ Options:
   --session-id TEXT        Use specific session ID
   --session-ttl INTEGER    Session TTL in seconds [default: 3600]
   --persistent-path TEXT   Path for persistent session storage
+```
+
+## Docker Deployment
+
+### Docker Compose (Recommended)
+
+The `docker-compose.yml` file provides a complete setup:
+
+```bash
+# Start the server
+docker-compose up -d
+
+# View logs
+docker-compose logs -f mockhaus
+
+# Stop the server
+docker-compose down
+
+# Start with file server for test data
+docker-compose --profile with-fileserver up -d
+```
+
+**Environment Configuration:**
+- `MOCKHAUS_MAX_SESSIONS`: Maximum concurrent sessions (default: 100)
+- `MOCKHAUS_SESSION_TTL`: Default session TTL in seconds (default: 3600)
+- `MOCKHAUS_CLEANUP_INTERVAL`: Background cleanup interval (default: 300s)
+- `MOCKHAUS_DEBUG`: Enable debug logging (default: false)
+
+**Data Persistence:**
+- `./data`: Mount for session data files
+- `./databases`: Mount for persistent database files
+- `./local-data`: Mount for local file access (created automatically)
+
+### Standalone Docker
+
+```bash
+# Build the image
+docker build -t mockhaus .
+
+# Run with basic setup
+docker run -d \
+  --name mockhaus \
+  -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -e MOCKHAUS_MAX_SESSIONS=50 \
+  mockhaus
+
+# Run with full persistence
+docker run -d \
+  --name mockhaus \
+  -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/databases:/app/databases \
+  -v $(pwd)/local-data:/app/local-data \
+  -e MOCKHAUS_DEBUG=true \
+  mockhaus
 ```
 
 ## Development
