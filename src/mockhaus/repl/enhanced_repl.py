@@ -7,6 +7,8 @@ from typing import Any, cast
 
 import requests
 
+from ..banner import print_repl_banner
+
 # Try to import prompt_toolkit for enhanced features
 try:
     from prompt_toolkit import prompt
@@ -493,10 +495,10 @@ def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | Non
 
 def main(session_type: str = "memory", session_id: str | None = None, session_ttl: int | None = None, persistent_path: str | None = None) -> None:
     """Enhanced interactive REPL for Mockhaus."""
-    # Print startup message with enhanced features status
-    print("🏠 Mockhaus Interactive REPL")
-    print("=" * 40)
-
+    # Print fancy banner
+    print_repl_banner()
+    
+    # Print enhanced features status
     if PROMPT_TOOLKIT_AVAILABLE:
         print("✅ Enhanced mode (with auto-completion and history)")
         print("   F5: Show databases, F6: Show tables, Ctrl+L: Clear screen")
