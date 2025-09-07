@@ -61,3 +61,6 @@ test_*.db
 
 # Local data
 local-research/
+
+.cursorindexingignore
+.specstory/
