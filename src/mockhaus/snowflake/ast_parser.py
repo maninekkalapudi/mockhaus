@@ -1,4 +1,12 @@
-"""AST-based parser for Snowflake-specific SQL statements."""
+"""This module provides an AST-based parser for Snowflake-specific SQL statements.
+
+It uses the `sqlglot` library to build an Abstract Syntax Tree (AST) from a
+SQL string, allowing for robust and accurate parsing of complex statements
+like `CREATE STAGE`, `CREATE FILE FORMAT`, and `COPY INTO`.
+
+This approach is more reliable than using regular expressions, as it correctly
+handles variations in syntax, whitespace, and quoting.
+"""
 
 from typing import Any
 
@@ -7,7 +15,10 @@ from sqlglot import expressions as exp
 
 
 class SnowflakeASTParser:
-    """Parser for Snowflake-specific SQL statements using sqlglot AST."""
+    """
+    A parser for Snowflake-specific SQL statements that uses `sqlglot` to
+    generate and analyze the Abstract Syntax Tree (AST).
+    """
 
     def __init__(self) -> None:
         """Initialize the AST parser."""
@@ -17,12 +28,13 @@ class SnowflakeASTParser:
         """
         Parse CREATE STAGE statement using AST.
 
-        Returns dict with:
-        - stage_name: Name of the stage
-        - stage_type: USER or EXTERNAL
-        - url: URL if external stage
-        - properties: Other properties
-        - error: Error message if parsing failed
+        Args:
+            sql: The SQL string to parse.
+
+        Returns:
+            A dictionary containing the parsed components of the statement,
+            including the stage name, type, URL, and other properties.
+            Returns an error message if parsing fails.
         """
         try:
             # Parse the SQL into AST
@@ -69,12 +81,14 @@ class SnowflakeASTParser:
 
     def parse_drop_stage(self, sql: str) -> dict[str, Any]:
         """
-        Parse DROP STAGE statement using AST.
+        Parses a `DROP STAGE` statement using an AST.
 
-        Returns dict with:
-        - stage_name: Name of the stage to drop
-        - if_exists: Whether IF EXISTS was specified
-        - error: Error message if parsing failed
+        Args:
+            sql: The SQL string to parse.
+
+        Returns:
+            A dictionary containing the parsed stage name and whether `IF EXISTS`
+            was specified. Returns an error message if parsing fails.
         """
         try:
             # Parse the SQL into AST
@@ -108,11 +122,12 @@ class SnowflakeASTParser:
         """
         Parse CREATE FILE FORMAT statement using AST.
 
-        Returns dict with:
-        - format_name: Name of the file format
-        - format_type: Type (CSV, JSON, PARQUET, etc.)
-        - properties: Format properties/options
-        - error: Error message if parsing failed
+        Args:
+            sql: The SQL string to parse.
+
+        Returns:
+            A dictionary containing the format name, type, and properties.
+            Returns an error message if parsing fails.
         """
         try:
             # Parse the SQL into AST
@@ -198,10 +213,12 @@ class SnowflakeASTParser:
         """
         Parse DROP FILE FORMAT statement using AST.
 
-        Returns dict with:
-        - format_name: Name of the file format to drop
-        - if_exists: Whether IF EXISTS was specified
-        - error: Error message if parsing failed
+        Args:
+            sql: The SQL string to parse.
+
+        Returns:
+            A dictionary containing the format name and whether `IF EXISTS` was
+            specified. Returns an error message if parsing fails.
         """
         try:
             # Parse the SQL into AST
@@ -233,15 +250,18 @@ class SnowflakeASTParser:
 
     def parse_copy_into(self, sql: str) -> dict[str, Any]:
         """
-        Parse COPY INTO statement using AST.
+        Parses a `COPY INTO` statement.
 
-        Returns dict with:
-        - table_name: Target table name
-        - stage_reference: Stage reference (e.g., '@stage/file')
-        - file_format_name: Named file format (if used)
-        - inline_format: Inline format specification (if used)
-        - options: Other COPY options
-        - error: Error message if parsing failed
+        This method first attempts to use `sqlglot` for parsing. If that fails
+        (as `COPY INTO` syntax can be complex), it falls back to a manual, 
+        regex-based parsing method.
+
+        Args:
+            sql: The SQL string to parse.
+
+        Returns:
+            A dictionary containing the parsed components, including the table
+            name, stage reference, and file format details.
         """
         try:
             # Parse the SQL into AST

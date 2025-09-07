@@ -1,4 +1,10 @@
-"""Command line interface for Mockhaus."""
+"""
+This module defines the command-line interface (CLI) for Mockhaus.
+
+It uses the `click` library to create a rich set of commands for interacting
+with the Mockhaus engine, including executing queries, managing the server,
+and handling data ingestion objects like stages and file formats.
+"""
 
 from typing import Any
 
@@ -11,6 +17,7 @@ from rich.text import Text
 
 from .executor import MockhausExecutor
 
+# Initialize Rich console for pretty output
 console = Console()
 
 
@@ -29,23 +36,24 @@ def main() -> None:
 def query(sql: Any, file: Any, database: Any, verbose: Any) -> None:
     """Execute a Snowflake SQL query."""
 
-    # Get SQL from argument or file
+    # Ensure that SQL is provided either as an argument or via a file
     if file:
         sql = file.read()
     elif not sql:
         console.print("[red]Error: Provide SQL query as argument or use --file option[/red]")
         return
 
-    # Execute the query
+    # Use the MockhausExecutor as a context manager to ensure connection is handled
     with MockhausExecutor(database) as executor:
-        # Create sample data if using in-memory database
+        # If using an in-memory database, create sample data for a better experience
         if database is None:
             executor.create_sample_data()
             console.print("[dim]Created sample data in in-memory database[/dim]\n")
 
+        # Execute the query and get the result
         result = executor.execute_snowflake_sql(sql)
 
-        # Display results
+        # Display the result, either success or error
         if result.success:
             _display_successful_result(result, verbose)
         else:
@@ -75,17 +83,18 @@ def serve(host: str, port: int, database: str, daemon: bool) -> None:
     console.print(f"[dim]API documentation available at http://{host}:{port}/docs[/dim]")
     console.print("[dim]Press Ctrl+C to stop the server[/dim]\n")
     
-    # Set environment variable for default database if specified
+    # Pass the database path to the server environment for the app to use
     if database:
         import os
         os.environ["MOCKHAUS_DEFAULT_DATABASE"] = database
     
     try:
+        # Run the FastAPI server using uvicorn
         uvicorn.run(
             "mockhaus.server.app:app",
             host=host,
             port=port,
-            reload=not daemon,
+            reload=not daemon,  # Enable auto-reload for development
             log_level="info" if not daemon else "warning"
         )
     except KeyboardInterrupt:
@@ -123,6 +132,7 @@ def sample() -> None:
 
     for i, sample in enumerate(samples, 1):
         console.print(f"[bold cyan]{i}. {sample['description']}[/bold cyan]")
+        # Use Rich to pretty-print the SQL with syntax highlighting
         syntax = Syntax(sample["sql"], "sql", theme="monokai", line_numbers=False)
         console.print(Panel(syntax, border_style="blue"))
         console.print()
@@ -132,7 +142,7 @@ def sample() -> None:
 def repl() -> None:
     """Start interactive REPL client."""
     try:
-        # Import the client module which will automatically select the best REPL
+        # Dynamically import the REPL to keep dependencies clean
         from client import repl_main
         repl_main()
     except ImportError:
@@ -150,7 +160,7 @@ def setup(database: Any) -> None:
     with MockhausExecutor(database) as executor:
         executor.create_sample_data()
 
-        # Test that it worked
+        # Verify that the data was created successfully
         result = executor.execute_snowflake_sql("SELECT COUNT(*) as count FROM sample_customers")
 
         if result.success and result.data:
@@ -165,6 +175,7 @@ def setup(database: Any) -> None:
             console.print(f"[red]✗ Failed to create sample data: {result.error}[/red]")
 
 
+# Create a command group for stage management
 @main.group()
 def stage() -> None:
     """Manage Snowflake stages."""
@@ -187,6 +198,7 @@ def list_stages(database: Any) -> None:
                 console.print("[yellow]No stages found[/yellow]")
                 return
 
+            # Display stages in a formatted table
             table = Table(show_header=True, header_style="bold cyan")
             table.add_column("Name", style="bold")
             table.add_column("Type")
@@ -227,7 +239,7 @@ def show_stage(name: str, database: Any) -> None:
                 console.print(f"[red]Stage '{name}' not found[/red]")
                 return
 
-            # Create info panel
+            # Create a Rich panel with detailed stage information
             info_text = Text()
             info_text.append("Name: ", style="bold")
             info_text.append(f"{stage.name}\n")
@@ -247,7 +259,7 @@ def show_stage(name: str, database: Any) -> None:
 
             console.print(Panel(info_text, title=f"Stage: {name}", border_style="blue"))
 
-            # List files in stage
+            # Attempt to list files within the stage
             try:
                 files = executor._ingestion_handler.stage_manager.list_stage_files(f"@{name}")
                 if files:
@@ -265,6 +277,7 @@ def show_stage(name: str, database: Any) -> None:
             console.print(f"[red]Error showing stage: {e}[/red]")
 
 
+# Create a command group for file format management
 @main.group()
 def format() -> None:
     """Manage file formats."""
@@ -287,6 +300,7 @@ def list_formats(database: Any) -> None:
                 console.print("[yellow]No file formats found[/yellow]")
                 return
 
+            # Display file formats in a formatted table
             table = Table(show_header=True, header_style="bold cyan")
             table.add_column("Name", style="bold")
             table.add_column("Type")
@@ -294,7 +308,7 @@ def list_formats(database: Any) -> None:
             table.add_column("Created", style="dim")
 
             for fmt in formats:
-                # Show key properties as a summary
+                # Provide a summary of key properties for quick reference
                 key_props = []
                 if fmt.format_type == "CSV":
                     delimiter = fmt.properties.get("field_delimiter", ",")
@@ -335,7 +349,7 @@ def show_format(name: str, database: Any) -> None:
                 console.print(f"[red]File format '{name}' not found[/red]")
                 return
 
-            # Create info panel
+            # Display detailed file format properties in a panel
             info_text = Text()
             info_text.append("Name: ", style="bold")
             info_text.append(f"{fmt.name}\n")
@@ -352,7 +366,7 @@ def show_format(name: str, database: Any) -> None:
 
             console.print(Panel(info_text, title=f"File Format: {name}", border_style="green"))
 
-            # Show DuckDB mapping
+            # Show how the format properties map to DuckDB options
             try:
                 duck_options = executor._ingestion_handler.format_manager.map_to_duckdb_options(fmt)
                 if duck_options:
@@ -367,9 +381,9 @@ def show_format(name: str, database: Any) -> None:
 
 
 def _display_successful_result(result: Any, verbose: Any) -> None:
-    """Display a successful query result."""
+    """Helper function to display a successful query result."""
 
-    # Show translation info if verbose
+    # If verbose, show the original and translated SQL
     if verbose:
         console.print("[bold]Translation Details[/bold]")
 
@@ -383,16 +397,16 @@ def _display_successful_result(result: Any, verbose: Any) -> None:
 
         console.print(f"[dim]Execution time: {result.execution_time_ms:.2f}ms[/dim]\n")
 
-    # Show results
+    # Display query results in a table
     if result.data:
         table = Table(show_header=True, header_style="bold magenta")
 
-        # Add columns
+        # Add columns from the result
         if result.columns:
             for column in result.columns:
                 table.add_column(column)
 
-        # Add rows
+        # Add rows to the table
         for row in result.data:
             row_values = []
             for column in result.columns or []:
@@ -408,11 +422,12 @@ def _display_successful_result(result: Any, verbose: Any) -> None:
 
 
 def _display_error_result(result: Any, verbose: Any) -> None:
-    """Display an error result."""
+    """Helper function to display an error result."""
 
     console.print("[bold red]Query Failed[/bold red]")
     console.print(f"[red]Error: {result.error}[/red]")
 
+    # If verbose, show the original SQL that caused the error
     if verbose and result.original_sql:
         console.print("\n[dim]Original SQL:[/dim]")
         original_syntax = Syntax(result.original_sql, "sql", theme="monokai", line_numbers=False)

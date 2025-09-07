@@ -7,7 +7,12 @@ from sqlglot import expressions as exp
 
 
 class SnowflakeToDuckDBTranslator:
-    """Translates Snowflake SQL queries to DuckDB SQL."""
+    """
+    Translates Snowflake SQL queries to DuckDB-compatible SQL using `sqlglot`.
+
+    This class is responsible for the core SQL translation, but does not handle
+    data ingestion statements (see `SnowflakeIngestionHandler`).
+    """
 
     def __init__(self) -> None:
         """Initialize the translator."""

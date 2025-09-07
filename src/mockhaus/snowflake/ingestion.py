@@ -12,14 +12,22 @@ from .stages import MockStageManager
 
 
 class SnowflakeIngestionHandler:
-    """Handles all Snowflake data ingestion operations."""
+    """
+    Handles all Snowflake data ingestion operations.
+
+    This class acts as a router for data ingestion statements, delegating to
+    the appropriate manager or translator (e.g., for stages, file formats, or
+    COPY INTO operations).
+    """
 
     def __init__(self, connection: duckdb.DuckDBPyConnection, use_ast_parser: bool = True) -> None:
-        """Initialize the ingestion handler with a DuckDB connection.
+        """
+        Initializes the ingestion handler.
 
         Args:
-            connection: DuckDB connection
-            use_ast_parser: Whether to use AST parser instead of regex (default: True)
+            connection: An active DuckDB connection.
+            use_ast_parser: If True, uses the AST-based parser for data
+                ingestion statements. Defaults to True.
         """
         self.connection = connection
         self.use_ast_parser = use_ast_parser
@@ -30,7 +38,15 @@ class SnowflakeIngestionHandler:
             self.ast_parser = SnowflakeASTParser()
 
     def is_data_ingestion_statement(self, sql: str) -> bool:
-        """Check if SQL statement is a data ingestion statement."""
+        """
+        Checks if a given SQL statement is a data ingestion command.
+
+        Args:
+            sql: The SQL statement to check.
+
+        Returns:
+            True if the statement is a data ingestion command, False otherwise.
+        """
         sql_upper = sql.strip().upper()
         return (
             sql_upper.startswith("CREATE STAGE")
@@ -41,7 +57,18 @@ class SnowflakeIngestionHandler:
         )
 
     def execute_ingestion_statement(self, sql: str) -> dict[str, Any]:
-        """Execute data ingestion statements."""
+        """
+        Executes a data ingestion statement.
+
+        This method routes the SQL to the appropriate handler based on the
+        command.
+
+        Args:
+            sql: The data ingestion SQL statement to execute.
+
+        Returns:
+            A dictionary containing the result of the operation.
+        """
         sql_upper = sql.strip().upper()
 
         try:

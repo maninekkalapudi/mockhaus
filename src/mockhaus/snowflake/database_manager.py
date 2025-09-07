@@ -1,4 +1,10 @@
-"""Database management for Snowflake DDL commands."""
+"""
+This module provides a manager for handling Snowflake database DDL commands.
+
+It is responsible for emulating commands like `CREATE DATABASE`, `DROP DATABASE`,
+`USE DATABASE`, and `SHOW DATABASES`. It manages the database files on the
+local filesystem, typically within a `databases` directory.
+"""
 
 import os
 import re
@@ -7,14 +13,16 @@ from typing import Optional
 
 
 class SnowflakeDatabaseManager:
-    """Handles Snowflake database DDL commands like CREATE DATABASE, USE DATABASE."""
+    """
+    Handles Snowflake database DDL commands by managing DuckDB database files.
+    """
     
     def __init__(self, base_path: str = "./databases"):
         """
-        Initialize database manager.
-        
+        Initializes the database manager.
+
         Args:
-            base_path: Directory where database files will be stored
+            base_path: The directory where database files will be stored.
         """
         self.base_path = Path(base_path)
         self.base_path.mkdir(exist_ok=True)
@@ -22,13 +30,13 @@ class SnowflakeDatabaseManager:
     
     def is_database_ddl(self, sql: str) -> bool:
         """
-        Check if SQL is a database DDL command.
-        
+        Checks if a given SQL statement is a database-level DDL command.
+
         Args:
-            sql: SQL statement to check
-            
+            sql: The SQL statement to check.
+
         Returns:
-            True if it's a database DDL command
+            True if the statement is a database DDL command, False otherwise.
         """
         sql_upper = sql.strip().upper()
         return (
@@ -41,13 +49,13 @@ class SnowflakeDatabaseManager:
     
     def execute_database_ddl(self, sql: str) -> dict:
         """
-        Execute database DDL command.
-        
+        Executes a database-level DDL command.
+
         Args:
-            sql: Database DDL SQL to execute
-            
+            sql: The database DDL SQL to execute.
+
         Returns:
-            Result dictionary with success status and message
+            A dictionary with the result of the operation.
         """
         sql_clean = sql.strip().rstrip(';')
         sql_upper = sql_clean.upper()
@@ -104,6 +112,7 @@ class SnowflakeDatabaseManager:
         try:
             import duckdb
             conn = duckdb.connect(str(db_file))
+            # Add a metadata table to mark it as a Mockhaus database
             conn.execute("CREATE TABLE _mockhaus_metadata (created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
             conn.close()
             
@@ -150,6 +159,7 @@ class SnowflakeDatabaseManager:
         
         try:
             os.remove(db_file)
+            # If the dropped database was the current one, reset it
             if self.current_database == db_name:
                 self.current_database = None
             
@@ -225,10 +235,10 @@ class SnowflakeDatabaseManager:
     
     def get_current_database_path(self) -> Optional[str]:
         """
-        Get the file path of the current database.
-        
+        Gets the file path of the currently selected database.
+
         Returns:
-            Path to current database file, or None if no database selected
+            The path to the current database file, or None if no database is selected.
         """
         if not self.current_database:
             return None

@@ -12,7 +12,19 @@ from .snowflake.database_manager import SnowflakeDatabaseManager
 
 @dataclass
 class QueryResult:
-    """Result of a query execution."""
+    """
+    Represents the result of a query execution.
+
+    Attributes:
+        success: Whether the query executed successfully.
+        data: The data returned by the query, as a list of dictionaries.
+        columns: A list of column names.
+        row_count: The number of rows returned.
+        execution_time_ms: The time taken to execute the query in milliseconds.
+        error: An error message if the query failed.
+        original_sql: The original Snowflake SQL query.
+        translated_sql: The translated DuckDB SQL query.
+    """
 
     success: bool
     data: list[dict[str, Any]] | None = None
@@ -25,15 +37,23 @@ class QueryResult:
 
 
 class MockhausExecutor:
-    """Executes translated SQL queries using DuckDB."""
+    """
+    The main engine for Mockhaus, responsible for orchestrating the translation
+    and execution of Snowflake SQL queries.
+
+    This class acts as a facade, delegating to the appropriate translator or
+    handler based on the type of SQL statement provided.
+    """
 
     def __init__(self, database_path: str | None = None, use_ast_parser: bool = True) -> None:
         """
-        Initialize the executor.
+        Initializes the MockhausExecutor.
 
         Args:
-            database_path: Path to DuckDB database file. If None, uses in-memory database.
-            use_ast_parser: Whether to use AST parser for ingestion statements (default: True).
+            database_path: The file path to a DuckDB database. If None, an
+                in-memory database is used.
+            use_ast_parser: If True, uses the AST-based parser for data
+                ingestion statements, which is more robust. Defaults to True.
         """
         self.database_path = database_path
         self.use_ast_parser = use_ast_parser
@@ -43,7 +63,11 @@ class MockhausExecutor:
         self._database_manager = SnowflakeDatabaseManager()
 
     def connect(self) -> None:
-        """Establish connection to DuckDB."""
+        """
+        Establishes a connection to the DuckDB database.
+
+        If a connection is already open, this method does nothing.
+        """
         if self._connection is None:
             # Use ":memory:" for in-memory database when path is None
             db_path = self.database_path if self.database_path is not None else ":memory:"
@@ -52,7 +76,7 @@ class MockhausExecutor:
             self._setup_data_ingestion()
 
     def disconnect(self) -> None:
-        """Close the DuckDB connection."""
+        """Closes the connection to the DuckDB database."""
         if self._connection:
             self._connection.close()
             self._connection = None
@@ -78,13 +102,17 @@ class MockhausExecutor:
 
     def execute_snowflake_sql(self, snowflake_sql: str) -> QueryResult:
         """
-        Execute a Snowflake SQL query by translating it to DuckDB SQL first.
+        Executes a Snowflake SQL query.
+
+        This method is the main entry point for all SQL execution. It inspects
+        the SQL to determine its type (query, data ingestion, or database DDL)
+        and delegates to the appropriate handler.
 
         Args:
-            snowflake_sql: The Snowflake SQL query to execute
+            snowflake_sql: The Snowflake SQL query to execute.
 
         Returns:
-            QueryResult containing the execution results
+            A QueryResult object containing the results of the execution.
         """
         import time
 
@@ -214,7 +242,10 @@ class MockhausExecutor:
         return {"data": data, "columns": columns, "row_count": len(rows)}
 
     def create_sample_data(self) -> None:
-        """Create some sample data for testing."""
+        """
+        Creates a sample 'sample_customers' table and populates it with
+        some data for testing purposes.
+        """
         self.connect()
 
         if not self._connection:

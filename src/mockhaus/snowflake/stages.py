@@ -1,4 +1,10 @@
-"""Stage management for Mockhaus data ingestion."""
+"""
+This module manages Snowflake stages for data ingestion in Mockhaus.
+
+It simulates Snowflake's stage functionality by mapping stage names to local
+file system directories. Metadata about each stage is stored in a DuckDB
+system table, allowing for persistence and management of stages.
+"""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +16,17 @@ import duckdb
 
 @dataclass
 class Stage:
-    """Represents a Snowflake stage in Mockhaus."""
+    """
+    Represents a Snowflake stage and its properties.
+
+    Attributes:
+        name: The name of the stage.
+        stage_type: The type of stage (e.g., 'USER', 'EXTERNAL').
+        url: The URL for an external stage.
+        local_path: The local file system path that represents the stage.
+        properties: A dictionary of properties for the stage.
+        created_at: The timestamp when the stage was created.
+    """
 
     name: str
     stage_type: str  # 'INTERNAL', 'USER', 'EXTERNAL', 'TABLE'
@@ -25,11 +41,19 @@ class Stage:
 
 
 class MockStageManager:
-    """Manages Snowflake stages using local file system."""
+    """
+    Manages Snowflake stages by mapping them to the local file system.
+    """
 
     def __init__(self, connection: duckdb.DuckDBPyConnection) -> None:
-        """Initialize stage manager with DuckDB connection."""
+        """
+        Initializes the stage manager.
+
+        Args:
+            connection: An active DuckDB connection.
+        """
         self.connection = connection
+        # Define base paths for different types of stages
         self.base_path = Path.home() / ".mockhaus"
         self.stages_path = self.base_path / "stages"
         self.tables_path = self.base_path / "tables"
@@ -41,12 +65,12 @@ class MockStageManager:
         self._create_system_tables()
 
     def _ensure_directories(self) -> None:
-        """Create necessary directories for stage operations."""
+        """Creates the necessary base directories for stage operations."""
         for path in [self.base_path, self.stages_path, self.tables_path, self.user_path, self.external_path]:
             path.mkdir(parents=True, exist_ok=True)
 
     def _create_system_tables(self) -> None:
-        """Create system tables for stage metadata."""
+        """Creates the `mockhaus_stages` table for storing stage metadata."""
         create_stages_table = """
         CREATE TABLE IF NOT EXISTS mockhaus_stages (
             name VARCHAR PRIMARY KEY,
@@ -60,7 +84,18 @@ class MockStageManager:
         self.connection.execute(create_stages_table)
 
     def create_stage(self, name: str, stage_type: str = "USER", url: str | None = None, properties: dict[str, Any] | None = None) -> Stage:
-        """Create a new stage."""
+        """
+        Creates a new stage.
+
+        Args:
+            name: The name of the stage.
+            stage_type: The type of stage.
+            url: The URL for an external stage.
+            properties: A dictionary of stage properties.
+
+        Returns:
+            A `Stage` object representing the new stage.
+        """
         if properties is None:
             properties = {}
 
@@ -79,7 +114,7 @@ class MockStageManager:
         return stage
 
     def _determine_local_path(self, name: str, stage_type: str, url: str | None) -> str:
-        """Determine local path for a stage based on type and URL."""
+        """Determines the local file system path for a stage."""
         if stage_type == "USER":
             return str(self.user_path / name)
         if stage_type == "INTERNAL" or stage_type == "TABLE":
@@ -110,7 +145,15 @@ class MockStageManager:
         self.connection.execute(insert_sql, [stage.name, stage.stage_type, stage.url, stage.local_path, json.dumps(stage.properties)])
 
     def get_stage(self, name: str) -> Stage | None:
-        """Get stage by name."""
+        """
+        Retrieves a stage by its name.
+
+        Args:
+            name: The name of the stage.
+
+        Returns:
+            A `Stage` object if found, otherwise None.
+        """
         result = self.connection.execute("SELECT * FROM mockhaus_stages WHERE name = ?", [name]).fetchone()
 
         if not result:
@@ -123,35 +166,29 @@ class MockStageManager:
             stage_type=result[1],
             url=result[2],
             local_path=result[3],
-            properties=json.loads(result[4]) if result[4] else {},
+            properties=json.loads(result[4] or '{}'),
             created_at=result[5],
         )
 
     def list_stages(self) -> list[Stage]:
-        """List all stages."""
+        """Lists all created stages."""
         results = self.connection.execute("SELECT * FROM mockhaus_stages").fetchall()
         stages = []
 
         import json
-
-        for result in results:
-            stages.append(
-                Stage(
-                    name=result[0],
-                    stage_type=result[1],
-                    url=result[2],
-                    local_path=result[3],
-                    properties=json.loads(result[4]) if result[4] else {},
-                    created_at=result[5],
-                )
-            )
-
-        return stages
+        return [Stage(name=r[0], stage_type=r[1], url=r[2], local_path=r[3], properties=json.loads(r[4] or '{}'), created_at=r[5]) for r in results]
 
     def drop_stage(self, name: str) -> bool:
-        """Drop a stage and optionally remove its directory."""
-        stage = self.get_stage(name)
-        if not stage:
+        """
+        Drops a stage by its name.
+
+        Args:
+            name: The name of the stage to drop.
+
+        Returns:
+            True if the stage was dropped, False if it was not found.
+        """
+        if not self.get_stage(name):
             return False
 
         # Remove from system table
@@ -164,12 +201,13 @@ class MockStageManager:
 
     def resolve_stage_path(self, stage_reference: str) -> str | None:
         """
-        Resolve a Snowflake stage reference to local file path.
+        Resolves a Snowflake stage reference to a local file path.
 
-        Examples:
-        - @my_stage/file.csv → ~/.mockhaus/stages/my_stage/file.csv
-        - @%table_name/file.csv → ~/.mockhaus/tables/table_name/file.csv
-        - @~/file.csv → ~/.mockhaus/user/file.csv
+        Args:
+            stage_reference: The stage reference (e.g., '@my_stage/file.csv').
+
+        Returns:
+            The resolved local file path as a string, or None if invalid.
         """
         if not stage_reference.startswith("@"):
             return None
@@ -204,7 +242,16 @@ class MockStageManager:
         return str(self.stages_path / stage_name / file_path)
 
     def list_stage_files(self, stage_reference: str, pattern: str = "*") -> list[str]:
-        """List files in a stage directory."""
+        """
+        Lists files within a stage directory that match a given pattern.
+
+        Args:
+            stage_reference: The stage to list files from.
+            pattern: A glob pattern to filter files.
+
+        Returns:
+            A list of file paths.
+        """
         base_path = self.resolve_stage_path(stage_reference)
         if not base_path:
             return []
@@ -236,7 +283,16 @@ class MockStageManager:
         return path.exists() or path.parent.exists()
 
     def ensure_stage_directory(self, stage_reference: str) -> str:
-        """Ensure stage directory exists and return the path."""
+        """
+        Ensures that the directory for a stage reference exists, creating it
+        if necessary.
+
+        Args:
+            stage_reference: The stage reference.
+
+        Returns:
+            The resolved local path of the stage directory.
+        """
         resolved_path = self.resolve_stage_path(stage_reference)
         if not resolved_path:
             raise ValueError(f"Invalid stage reference: {stage_reference}")

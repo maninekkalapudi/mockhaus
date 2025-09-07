@@ -1,4 +1,10 @@
-"""COPY INTO statement translation for Mockhaus data ingestion."""
+"""
+This module handles the translation of Snowflake's `COPY INTO` statements.
+
+It is responsible for parsing the `COPY INTO` command, resolving the stage and
+file format, and generating a DuckDB-compatible `COPY` statement that can be
+executed to load data into a table.
+"""
 
 import re
 from dataclasses import dataclass
@@ -12,7 +18,21 @@ from .stages import MockStageManager
 
 @dataclass
 class CopyIntoContext:
-    """Context for COPY INTO operation."""
+    """
+    A data class to hold the parsed components of a `COPY INTO` statement.
+
+    Attributes:
+        table_name: The name of the target table for the COPY operation.
+        stage_reference: The full stage reference (e.g., '@my_stage/data.csv').
+        file_path: The resolved local file path for the data file.
+        file_format: The `FileFormat` object to use for parsing the data.
+        inline_format: The raw string of an inline file format specification.
+        on_error: The error handling behavior (e.g., 'ABORT', 'CONTINUE').
+        force: Whether to force loading of data, ignoring certain errors.
+        purge: Whether to purge the data file after loading.
+        pattern: A regex pattern to filter files in the stage.
+        validation_mode: The validation mode for the COPY operation.
+    """
 
     table_name: str
     stage_reference: str
@@ -27,23 +47,41 @@ class CopyIntoContext:
 
 
 class CopyIntoTranslator:
-    """Translates Snowflake COPY INTO statements to DuckDB COPY statements."""
+    """Translates Snowflake `COPY INTO` statements to DuckDB `COPY` statements."""
 
     def __init__(self, stage_manager: MockStageManager, format_manager: MockFileFormatManager, use_ast_parser: bool = True) -> None:
-        """Initialize COPY INTO translator."""
+        """
+        Initializes the `COPY INTO` translator.
+
+        Args:
+            stage_manager: An instance of `MockStageManager`.
+            format_manager: An instance of `MockFileFormatManager`.
+            use_ast_parser: Whether to use the AST-based parser.
+        """
         self.stage_manager = stage_manager
         self.format_manager = format_manager
         self.use_ast_parser = use_ast_parser
         self.ast_parser = SnowflakeASTParser() if use_ast_parser else None
 
     def parse_copy_into_statement(self, sql: str) -> CopyIntoContext:
-        """Parse a COPY INTO statement and extract components."""
+        """
+        Parses a `COPY INTO` statement and returns a context object.
+
+        This method will use the AST parser if enabled, otherwise it falls back
+        to a regex-based parser.
+
+        Args:
+            sql: The `COPY INTO` SQL statement.
+
+        Returns:
+            A `CopyIntoContext` object with the parsed components.
+        """
         if self.use_ast_parser and self.ast_parser:
             return self._parse_copy_into_with_ast(sql)
         return self._parse_copy_into_with_regex(sql)
 
     def _parse_copy_into_with_ast(self, sql: str) -> CopyIntoContext:
-        """Parse COPY INTO statement using AST parser."""
+        """Parses a `COPY INTO` statement using the AST parser."""
         if not self.ast_parser:
             raise ValueError("AST parser is not available")
         parsed = self.ast_parser.parse_copy_into(sql)
@@ -54,10 +92,10 @@ class CopyIntoTranslator:
         context = CopyIntoContext(
             table_name=parsed["table_name"],
             stage_reference=parsed["stage_reference"],
-            file_path="",  # Will be resolved later
+            file_path="",  # This will be resolved later
         )
 
-        # Handle file format
+        # Resolve the file format, whether it's a named format or inline
         if parsed.get("file_format_name"):
             context.file_format = self.format_manager.get_format(parsed["file_format_name"])
             if not context.file_format:
@@ -66,7 +104,7 @@ class CopyIntoTranslator:
             context.inline_format = parsed["inline_format"]
             context.file_format = self.format_manager.create_temp_format_from_inline(parsed["inline_format"])
 
-        # Handle other options
+        # Set other options from the parsed statement
         options = parsed.get("options", {})
         context.on_error = options.get("ON_ERROR", "ABORT").upper()
         context.force = options.get("FORCE", False)
@@ -77,8 +115,7 @@ class CopyIntoTranslator:
         return context
 
     def _parse_copy_into_with_regex(self, sql: str) -> CopyIntoContext:
-        """Parse COPY INTO statement using regex (legacy method)."""
-        # Remove extra whitespace and normalize
+        """Parses a `COPY INTO` statement using regex (legacy method)."""
         sql = re.sub(r"\s+", " ", sql.strip())
 
         # Basic pattern for COPY INTO
@@ -161,11 +198,18 @@ class CopyIntoTranslator:
             context.validation_mode = validation_match.group(1).upper()
 
     def translate_copy_into(self, sql: str) -> str:
-        """Translate a COPY INTO statement to DuckDB COPY statement."""
-        # Parse the COPY INTO statement
+        """
+        Translates a Snowflake `COPY INTO` statement to a DuckDB `COPY` statement.
+
+        Args:
+            sql: The `COPY INTO` SQL statement.
+
+        Returns:
+            A DuckDB-compatible `COPY` statement.
+        """
         context = self.parse_copy_into_statement(sql)
 
-        # Resolve file path from stage reference
+        # Resolve the stage reference to a local file path
         resolved_path = self.stage_manager.resolve_stage_path(context.stage_reference)
         if not resolved_path:
             raise ValueError(f"Cannot resolve stage reference: {context.stage_reference}")
@@ -201,8 +245,15 @@ class CopyIntoTranslator:
         return list(directory.glob(glob_pattern))
 
     def _generate_duckdb_copy(self, context: CopyIntoContext) -> str:
-        """Generate DuckDB COPY statement from context."""
-        # Start with basic COPY statement
+        """
+        Generates the final DuckDB `COPY` statement from the context.
+
+        Args:
+            context: The `CopyIntoContext` object.
+
+        Returns:
+            The final DuckDB `COPY` statement as a string.
+        """
         copy_sql = f"COPY {context.table_name} FROM '{context.file_path}'"
 
         # Add format options
@@ -224,7 +275,15 @@ class CopyIntoTranslator:
         return copy_sql
 
     def validate_copy_operation(self, context: CopyIntoContext) -> list[str]:
-        """Validate COPY operation and return any warnings or errors."""
+        """
+        Validates a `COPY` operation and returns a list of warnings.
+
+        Args:
+            context: The `CopyIntoContext` for the operation.
+
+        Returns:
+            A list of warning messages.
+        """
         warnings = []
 
         # Check if file exists
@@ -250,9 +309,17 @@ class CopyIntoTranslator:
         return warnings
 
     def execute_copy_operation(self, sql: str, connection: Any) -> dict[str, Any]:
-        """Execute COPY INTO operation and return results."""
+        """
+        Executes a `COPY INTO` operation and returns the result.
+
+        Args:
+            sql: The `COPY INTO` SQL statement.
+            connection: An active DuckDB connection.
+
+        Returns:
+            A dictionary containing the result of the operation.
+        """
         try:
-            # Translate to DuckDB COPY
             duckdb_sql = self.translate_copy_into(sql)
 
             # Execute the translated statement

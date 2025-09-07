@@ -1,4 +1,10 @@
-"""File format management for Mockhaus data ingestion."""
+"""
+This module manages Snowflake file formats for data ingestion in Mockhaus.
+
+It provides functionality to create, manage, and drop file formats, storing their
+metadata in a DuckDB system table. It also handles the mapping of Snowflake
+file format properties to their equivalents in DuckDB's `COPY` command.
+"""
 
 import json
 from dataclasses import dataclass, field
@@ -9,25 +15,37 @@ import duckdb
 
 @dataclass
 class FileFormat:
-    """Represents a Snowflake file format in Mockhaus."""
+    """Represents a Snowflake file format and its properties.
+
+    Attributes:
+        name: The name of the file format.
+        format_type: The type of the file format (e.g., 'CSV', 'JSON').
+        properties: A dictionary of properties for the file format.
+        created_at: The timestamp when the file format was created.
+    """
 
     name: str
-    format_type: str  # 'CSV', 'JSON', 'PARQUET', 'AVRO', 'ORC', 'XML'
+    format_type: str  # e.g., 'CSV', 'JSON', 'PARQUET'
     properties: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
 
 
 class MockFileFormatManager:
-    """Manages Snowflake file formats using DuckDB."""
+    """Manages Snowflake file formats using a DuckDB table for metadata storage.
+    """
 
     def __init__(self, connection: duckdb.DuckDBPyConnection) -> None:
-        """Initialize file format manager with DuckDB connection."""
+        """Initializes the file format manager.
+
+        Args:
+            connection: An active DuckDB connection.
+        """
         self.connection = connection
         self._create_system_tables()
         self._create_default_formats()
 
     def _create_system_tables(self) -> None:
-        """Create system tables for file format metadata."""
+        """Creates the `mockhaus_file_formats` table if it doesn't exist."""
         create_formats_table = """
         CREATE TABLE IF NOT EXISTS mockhaus_file_formats (
             name VARCHAR PRIMARY KEY,
@@ -39,14 +57,14 @@ class MockFileFormatManager:
         self.connection.execute(create_formats_table)
 
     def _create_default_formats(self) -> None:
-        """Create default file formats."""
+        """Creates default file formats like `CSV_DEFAULT` if they don't exist."""
         default_formats = [
             {
                 "name": "CSV_DEFAULT",
                 "format_type": "CSV",
                 "properties": {
                     "field_delimiter": ",",
-                    "record_delimiter": "\\n",
+                    "record_delimiter": "\n",
                     "skip_header": 0,
                     "field_optionally_enclosed_by": None,
                     "null_if": [],
@@ -69,7 +87,17 @@ class MockFileFormatManager:
                 self.create_format(fmt["name"], fmt["format_type"], fmt["properties"])  # type: ignore[arg-type]
 
     def create_format(self, name: str, format_type: str, properties: dict[str, Any] | None = None) -> FileFormat:
-        """Create a new file format."""
+        """
+        Creates a new file format and stores it in the database.
+
+        Args:
+            name: The name of the file format.
+            format_type: The type of the file format (e.g., 'CSV').
+            properties: A dictionary of properties for the format.
+
+        Returns:
+            A `FileFormat` object representing the new format.
+        """
         if properties is None:
             properties = {}
 
@@ -93,7 +121,7 @@ class MockFileFormatManager:
         return file_format
 
     def _get_default_properties(self, format_type: str) -> dict[str, Any]:
-        """Get default properties for a format type."""
+        """Returns the default properties for a given format type."""
         defaults = {
             "CSV": {
                 "field_delimiter": ",",
@@ -112,7 +140,7 @@ class MockFileFormatManager:
         return defaults.get(format_type, {}).copy()  # type: ignore[no-any-return, attr-defined]
 
     def _store_format_metadata(self, file_format: FileFormat) -> None:
-        """Store file format metadata in system table."""
+        """Stores file format metadata in the `mockhaus_file_formats` table."""
         insert_sql = """
         INSERT OR REPLACE INTO mockhaus_file_formats
         (name, format_type, properties)
@@ -121,7 +149,15 @@ class MockFileFormatManager:
         self.connection.execute(insert_sql, [file_format.name, file_format.format_type, json.dumps(file_format.properties)])
 
     def get_format(self, name: str) -> FileFormat | None:
-        """Get file format by name."""
+        """
+        Retrieves a file format by its name.
+
+        Args:
+            name: The name of the file format.
+
+        Returns:
+            A `FileFormat` object if found, otherwise None.
+        """
         result = self.connection.execute("SELECT * FROM mockhaus_file_formats WHERE name = ?", [name]).fetchone()
 
         if not result:
@@ -142,7 +178,15 @@ class MockFileFormatManager:
         return formats
 
     def drop_format(self, name: str) -> bool:
-        """Drop a file format."""
+        """
+        Drops a file format by its name.
+
+        Args:
+            name: The name of the file format to drop.
+
+        Returns:
+            True if the format was dropped, False if it was not found.
+        """
         if not self.get_format(name):
             return False
 
@@ -150,7 +194,15 @@ class MockFileFormatManager:
         return True
 
     def map_to_duckdb_options(self, file_format: FileFormat) -> dict[str, Any]:
-        """Map Snowflake file format properties to DuckDB COPY options."""
+        """
+        Maps Snowflake file format properties to DuckDB `COPY` options.
+
+        Args:
+            file_format: The `FileFormat` object to map.
+
+        Returns:
+            A dictionary of DuckDB-compatible options.
+        """
         props = file_format.properties
         format_type = file_format.format_type
 
@@ -164,7 +216,7 @@ class MockFileFormatManager:
         return {"FORMAT": format_type}
 
     def _map_csv_options(self, props: dict[str, Any]) -> dict[str, Any]:
-        """Map CSV format properties to DuckDB options."""
+        """Maps CSV-specific properties to DuckDB options."""
         options = {"FORMAT": "CSV"}
 
         # Field delimiter
@@ -215,9 +267,13 @@ class MockFileFormatManager:
 
     def parse_inline_format(self, format_spec: str) -> dict[str, Any]:
         """
-        Parse inline format specification from COPY INTO statement.
+        Parses an inline file format specification from a `COPY INTO` statement.
 
-        Example: "TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1"
+        Args:
+            format_spec: The inline format string (e.g., "TYPE = 'CSV' ...").
+
+        Returns:
+            A dictionary of parsed properties.
         """
         # This is a simplified parser for common format specifications
         # In a full implementation, you'd want a proper parser
@@ -248,7 +304,15 @@ class MockFileFormatManager:
         return options
 
     def create_temp_format_from_inline(self, inline_spec: str) -> FileFormat:
-        """Create a temporary file format from inline specification."""
+        """
+        Creates a temporary `FileFormat` object from an inline specification.
+
+        Args:
+            inline_spec: The inline format string.
+
+        Returns:
+            A temporary `FileFormat` object.
+        """
         options = self.parse_inline_format(inline_spec)
         format_type = options.pop("TYPE", "CSV")
 
