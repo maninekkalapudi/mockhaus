@@ -6,6 +6,8 @@ from typing import Any
 
 import duckdb
 
+from .my_logging import debug_log
+from .query_history import QueryContext, QueryHistory, QueryMetrics
 from .snowflake import SnowflakeIngestionHandler, SnowflakeToDuckDBTranslator
 from .snowflake.database_manager import SnowflakeDatabaseManager
 
@@ -45,22 +47,27 @@ class MockhausExecutor:
     handler based on the type of SQL statement provided.
     """
 
-    def __init__(self, database_path: str | None = None, use_ast_parser: bool = True) -> None:
+    def __init__(
+        self,
+        query_context: QueryContext | None = None,
+    ) -> None:
         """
         Initializes the MockhausExecutor.
 
         Args:
-            database_path: The file path to a DuckDB database. If None, an
-                in-memory database is used.
-            use_ast_parser: If True, uses the AST-based parser for data
-                ingestion statements, which is more robust. Defaults to True.
+            query_context: Optional context information for query tracking.
         """
-        self.database_path = database_path
-        self.use_ast_parser = use_ast_parser
+        # Database path for persistent connections, None for in-memory
+        self.database_path: str | None = None
+
         self.translator = SnowflakeToDuckDBTranslator()
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._ingestion_handler: SnowflakeIngestionHandler | None = None
-        self._database_manager = SnowflakeDatabaseManager()
+        self._database_manager: SnowflakeDatabaseManager | None = None
+
+        # Query history - always enabled as in-memory table
+        self._history = QueryHistory()
+        self.query_context = query_context or QueryContext()
 
     def connect(self) -> None:
         """
@@ -69,11 +76,12 @@ class MockhausExecutor:
         If a connection is already open, this method does nothing.
         """
         if self._connection is None:
-            # Use ":memory:" for in-memory database when path is None
-            db_path = self.database_path if self.database_path is not None else ":memory:"
+            # Use database_path if set, otherwise in-memory
+            db_path = self.database_path if self.database_path else ":memory:"
             self._connection = duckdb.connect(db_path)
             self._setup_database()
             self._setup_data_ingestion()
+            self._setup_history()
 
     def disconnect(self) -> None:
         """Closes the connection to the DuckDB database."""
@@ -81,10 +89,17 @@ class MockhausExecutor:
             self._connection.close()
             self._connection = None
 
+        # Reset history state
+        if self._history:
+            self._history.close()
+
     def _setup_database(self) -> None:
         """Set up the database with initial configuration."""
         if not self._connection:
             return
+
+        # Initialize database manager with connection (always in-memory mode)
+        self._database_manager = SnowflakeDatabaseManager(connection=self._connection)
 
         # Set up some basic configuration that might help with Snowflake compatibility
         with contextlib.suppress(Exception):
@@ -97,8 +112,13 @@ class MockhausExecutor:
         if not self._connection:
             return
 
-        # Initialize ingestion handler with parser preference
-        self._ingestion_handler = SnowflakeIngestionHandler(self._connection, self.use_ast_parser)
+        # Initialize ingestion handler (always use AST parser)
+        self._ingestion_handler = SnowflakeIngestionHandler(self._connection)
+
+    def _setup_history(self) -> None:
+        """Set up query history with the main connection."""
+        if self._history and self._connection:
+            self._history.connect(self._connection)
 
     def execute_snowflake_sql(self, snowflake_sql: str) -> QueryResult:
         """
@@ -117,21 +137,32 @@ class MockhausExecutor:
         import time
 
         start_time = time.time()
+        query_result = None
+        metrics = None
 
         try:
+            debug_log("Executing Snowflake SQL", sql=snowflake_sql)
+
+            # Ensure connection is established
+            if self._connection is None:
+                self.connect()
+
+            # Track timing for different phases
+            time.time()
+
             # Check if this is a database DDL statement first
+            if self._database_manager is None:
+                raise RuntimeError("Database manager not initialized")
             if self._database_manager.is_database_ddl(snowflake_sql):
                 result = self._database_manager.execute_database_ddl(snowflake_sql)
                 execution_time = (time.time() - start_time) * 1000
-                
+
                 if result["success"]:
-                    # For USE DATABASE commands, switch to the new database
-                    if "database_path" in result:
-                        self.database_path = result["database_path"]
-                        # Reconnect to the new database
-                        self.disconnect()
-                        self.connect()
-                    
+                    # For USE DATABASE commands, update context
+                    if "database_name" in result:
+                        # Update context with new database
+                        self.query_context.database_name = result.get("database_name")
+
                     # Format response based on command type
                     data = None
                     columns = None
@@ -143,8 +174,8 @@ class MockhausExecutor:
                         # CREATE/DROP/USE DATABASE
                         data = [{"message": result["message"]}]
                         columns = ["message"]
-                    
-                    return QueryResult(
+
+                    query_result = QueryResult(
                         success=True,
                         data=data,
                         columns=columns,
@@ -154,7 +185,7 @@ class MockhausExecutor:
                         translated_sql="-- Database DDL (no translation needed)",
                     )
                 else:
-                    return QueryResult(
+                    query_result = QueryResult(
                         success=False,
                         error=result["error"],
                         execution_time_ms=execution_time,
@@ -162,15 +193,31 @@ class MockhausExecutor:
                         translated_sql="",
                     )
 
+                # Record in history
+                if self._history:
+                    self._history.record_query(
+                        original_sql=snowflake_sql,
+                        translated_sql=query_result.translated_sql,
+                        context=self.query_context,
+                        execution_time_ms=execution_time,
+                        status="SUCCESS" if query_result.success else "ERROR",
+                        rows_affected=query_result.row_count if query_result.success else None,
+                        error=Exception(query_result.error) if query_result.error else None,
+                    )
+
+                return query_result
+
             # Ensure we're connected
             self.connect()
 
             # Check if this is a data ingestion statement
             if self._ingestion_handler and self._ingestion_handler.is_data_ingestion_statement(snowflake_sql):
+                debug_log("Detected data ingestion statement", sql=snowflake_sql)
                 result = self._ingestion_handler.execute_ingestion_statement(snowflake_sql)
                 execution_time = (time.time() - start_time) * 1000
+                debug_log("Ingestion complete", success=result["success"], rows_loaded=result.get("rows_loaded", 0))
 
-                return QueryResult(
+                query_result = QueryResult(
                     success=result["success"],
                     data=[{"rows_loaded": result["rows_loaded"]}] if result["success"] else None,
                     columns=["rows_loaded"] if result["success"] else None,
@@ -181,34 +228,91 @@ class MockhausExecutor:
                     error=result["errors"][0] if result["errors"] else None,
                 )
 
-            # Translate the SQL
+                # Record in history
+                if self._history:
+                    self._history.record_query(
+                        original_sql=snowflake_sql,
+                        translated_sql=query_result.translated_sql,
+                        context=self.query_context,
+                        execution_time_ms=execution_time,
+                        status="SUCCESS" if query_result.success else "ERROR",
+                        rows_affected=result.get("rows_loaded", 0) if query_result.success else None,
+                        error=Exception(query_result.error) if query_result.error else None,
+                    )
+
+                return query_result
+
+            # Track translation time
+            translation_start = time.time()
+            debug_log("Translating SQL", original=snowflake_sql)
             translated_sql = self.translator.translate(snowflake_sql)
+            translation_time = (time.time() - translation_start) * 1000
+            debug_log("SQL translated", translated=translated_sql, translation_time_ms=translation_time)
 
-            # Execute the translated query
+            # Track execution time
+            execution_start = time.time()
+            debug_log("Executing DuckDB SQL", sql=translated_sql)
             result = self._execute_duckdb_sql(translated_sql)
+            pure_execution_time = (time.time() - execution_start) * 1000
+            debug_log("Execution complete", rows=result["row_count"], execution_time_ms=pure_execution_time)
 
-            execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+            total_time = (time.time() - start_time) * 1000
 
-            return QueryResult(
+            query_result = QueryResult(
                 success=True,
                 data=result["data"],
                 columns=result["columns"],
                 row_count=result["row_count"],
-                execution_time_ms=execution_time,
+                execution_time_ms=total_time,
                 original_sql=snowflake_sql,
                 translated_sql=translated_sql,
             )
 
+            # Record in history with metrics
+            if self._history:
+                query_id = self._history.record_query(
+                    original_sql=snowflake_sql,
+                    translated_sql=translated_sql,
+                    context=self.query_context,
+                    execution_time_ms=pure_execution_time,
+                    status="SUCCESS",
+                    rows_affected=result["row_count"],
+                )
+
+                # Record performance metrics
+                metrics = QueryMetrics(
+                    query_id=query_id,
+                    translation_time_ms=int(translation_time),
+                    execution_time_ms=int(pure_execution_time),
+                    total_time_ms=int(total_time),
+                )
+                self._history.record_metrics(metrics)
+
+            return query_result
+
         except Exception as e:
             execution_time = (time.time() - start_time) * 1000
 
-            return QueryResult(
+            query_result = QueryResult(
                 success=False,
                 error=str(e),
                 execution_time_ms=execution_time,
                 original_sql=snowflake_sql,
                 translated_sql="",
             )
+
+            # Record failed query in history
+            if self._history:
+                self._history.record_query(
+                    original_sql=snowflake_sql,
+                    translated_sql="",
+                    context=self.query_context,
+                    execution_time_ms=execution_time,
+                    status="ERROR",
+                    error=e,
+                )
+
+            return query_result
 
     def _execute_duckdb_sql(self, duckdb_sql: str) -> dict[str, Any]:
         """

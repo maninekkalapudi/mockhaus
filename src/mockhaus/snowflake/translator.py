@@ -3,7 +3,8 @@
 from typing import Any
 
 import sqlglot
-from sqlglot import expressions as exp
+
+from ..sqlglot.dialects import CustomDuckDB, CustomSnowflake
 
 
 class SnowflakeToDuckDBTranslator:
@@ -16,8 +17,8 @@ class SnowflakeToDuckDBTranslator:
 
     def __init__(self) -> None:
         """Initialize the translator."""
-        self.source_dialect = "snowflake"
-        self.target_dialect = "duckdb"
+        self.source_dialect = CustomSnowflake
+        self.target_dialect = CustomDuckDB
 
     def translate(self, snowflake_sql: str) -> str:
         """
@@ -33,50 +34,15 @@ class SnowflakeToDuckDBTranslator:
             ValueError: If the SQL cannot be parsed or translated
         """
         try:
-            # Parse the Snowflake SQL
+            # Parse the Snowflake SQL using custom dialect
             parsed = sqlglot.parse_one(snowflake_sql, dialect=self.source_dialect)
 
-            # Apply custom transformations
-            transformed = self._apply_custom_transformations(parsed)
-
-            # Generate DuckDB SQL
-            return transformed.sql(dialect=self.target_dialect, pretty=True)
+            # Generate DuckDB SQL using custom dialect
+            # The dialects handle the SYSDATE transformation automatically
+            return parsed.sql(dialect=self.target_dialect, pretty=True)
 
         except Exception as e:
             raise ValueError(f"Failed to translate SQL: {snowflake_sql}. Error: {str(e)}") from e
-
-    def _apply_custom_transformations(self, parsed_sql: exp.Expression) -> exp.Expression:
-        """
-        Apply custom transformations for Snowflake-specific patterns.
-
-        Args:
-            parsed_sql: The parsed SQL expression
-
-        Returns:
-            The transformed SQL expression
-        """
-        # Transform common Snowflake functions to DuckDB equivalents
-        transformed = parsed_sql.transform(self._transform_functions)
-
-        # Handle case sensitivity (Snowflake is case-insensitive by default)
-        return self._handle_case_sensitivity(transformed)
-
-    def _transform_functions(self, node: exp.Expression) -> exp.Expression:
-        """Transform Snowflake-specific functions to DuckDB equivalents."""
-        # For now, let's skip function transformations and just return the node as-is
-        # We'll add function transformations later once we have basic translation working
-        return node
-
-    def _handle_case_sensitivity(self, parsed_sql: exp.Expression) -> exp.Expression:
-        """
-        Handle case sensitivity differences between Snowflake and DuckDB.
-
-        Snowflake is case-insensitive by default, DuckDB is case-sensitive.
-        """
-        # For now, we'll leave identifiers as-is
-        # In a full implementation, we might want to normalize to uppercase
-        # or handle quoted identifiers differently
-        return parsed_sql
 
     def get_translation_info(self, snowflake_sql: str) -> dict[str, Any]:
         """
@@ -90,38 +56,40 @@ class SnowflakeToDuckDBTranslator:
         """
         try:
             parsed = sqlglot.parse_one(snowflake_sql, dialect=self.source_dialect)
-            transformed = self._apply_custom_transformations(parsed)
-            duckdb_sql = transformed.sql(dialect=self.target_dialect, pretty=True)
+            duckdb_sql = parsed.sql(dialect=self.target_dialect, pretty=True)
 
             return {
                 "original_sql": snowflake_sql,
                 "translated_sql": duckdb_sql,
-                "source_dialect": self.source_dialect,
-                "target_dialect": self.target_dialect,
+                "source_dialect": self.source_dialect.__name__ if hasattr(self.source_dialect, "__name__") else str(self.source_dialect),
+                "target_dialect": self.target_dialect.__name__ if hasattr(self.target_dialect, "__name__") else str(self.target_dialect),
                 "success": True,
                 "error": None,
-                "transformations_applied": self._get_applied_transformations(parsed, transformed),
+                "transformations_applied": self._get_applied_transformations(snowflake_sql, duckdb_sql),
             }
 
         except Exception as e:
             return {
                 "original_sql": snowflake_sql,
                 "translated_sql": None,
-                "source_dialect": self.source_dialect,
-                "target_dialect": self.target_dialect,
+                "source_dialect": self.source_dialect.__name__ if hasattr(self.source_dialect, "__name__") else str(self.source_dialect),
+                "target_dialect": self.target_dialect.__name__ if hasattr(self.target_dialect, "__name__") else str(self.target_dialect),
                 "success": False,
                 "error": str(e),
                 "transformations_applied": [],
             }
 
-    def _get_applied_transformations(self, original: exp.Expression, transformed: exp.Expression) -> list[str]:
+    def _get_applied_transformations(self, original_sql: str, translated_sql: str) -> list[str]:
         """Get a list of transformations that were applied."""
         transformations = []
 
-        # This is a simplified implementation
-        # In practice, you'd want to track transformations more systematically
-        if str(original) != str(transformed):
-            transformations.append("function_mapping")
+        # Check if SYSDATE was transformed
+        if "SYSDATE(" in original_sql.upper() and "CURRENT_TIMESTAMP AT TIME ZONE" in translated_sql.upper():
+            transformations.append("sysdate_to_utc")
+
+        # Check if there are other differences indicating transformation
+        if original_sql.strip() != translated_sql.strip():
+            transformations.append("dialect_translation")
 
         return transformations
 

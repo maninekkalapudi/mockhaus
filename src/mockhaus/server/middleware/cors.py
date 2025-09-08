@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 def add_cors_middleware(app: FastAPI) -> None:
     """
     Add CORS middleware to the FastAPI application.
-    
+
     Allows cross-origin requests for web client access.
     In production, configure origins more restrictively.
     """

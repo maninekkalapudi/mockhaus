@@ -1,0 +1,48 @@
+{
+  "description": "Test PARQUET files for Mockhaus integration testing",
+  "datasets": {
+    "basic": {
+      "description": "Basic test data with common data types",
+      "columns": [
+        "id",
+        "name",
+        "age",
+        "salary",
+        "is_active",
+        "department"
+      ],
+      "rows": 5
+    },
+    "with_nulls": {
+      "description": "Test data with NULL values to test NULL handling",
+      "columns": [
+        "id",
+        "name",
+        "age",
+        "salary",
+        "is_active"
+      ],
+      "rows": 5,
+      "notes": "Contains NULL values in various columns"
+    },
+    "with_binary": {
+      "description": "Test data with binary fields for BINARY_AS_TEXT testing",
+      "columns": [
+        "id",
+        "name",
+        "binary_data",
+        "text_data"
+      ],
+      "rows": 3,
+      "notes": "Contains binary data column for testing binary_as_string option"
+    }
+  },
+  "compressions": {
+    "none": "Uncompressed PARQUET files",
+    "snappy": "Snappy compression (default in DuckDB)",
+    "gzip": "GZIP compression",
+    "brotli": "Brotli compression",
+    "lz4": "LZ4 compression",
+    "zstd": "ZSTD compression"
+  }
+}

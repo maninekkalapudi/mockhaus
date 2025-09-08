@@ -1,0 +1,41 @@
+services:
+  mockhaus:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - MOCKHAUS_MAX_SESSIONS=100
+      - MOCKHAUS_SESSION_TTL=3600
+      - MOCKHAUS_CLEANUP_INTERVAL=300
+      - MOCKHAUS_DEBUG=false
+    volumes:
+      # Mount volumes for data persistence
+      - ./data:/app/data
+      - ./databases:/app/databases
+      # Optional: Mount local files for development
+      - type: bind
+        source: ./local-data
+        target: /app/local-data
+        bind:
+          create_host_path: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Optional: Add a simple file server for serving test data files
+  file-server:
+    image: nginx:alpine
+    ports:
+      - "8081:80"
+    volumes:
+      - ./test-data:/usr/share/nginx/html:ro
+    profiles:
+      - with-fileserver
+
+networks:
+  default:
+    name: mockhaus-network
