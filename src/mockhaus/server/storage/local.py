@@ -1,4 +1,13 @@
-"""Local file storage backend for persistent sessions."""
+"""
+This module provides local file system storage backends for persistent sessions.
+
+It includes two implementations:
+- `LocalFileBackend`: Manages a database file at a specified, permanent path on
+  the local file system.
+- `TempFileBackend`: Manages a database file within a temporary directory that is
+  automatically created and cleaned up, suitable for ephemeral sessions that
+  still require a file backing.
+"""
 
 import logging
 import os
@@ -13,10 +22,21 @@ logger = logging.getLogger(__name__)
 
 
 class LocalFileBackend(StorageBackend):
-    """Local file system storage backend for development and testing."""
+    """
+    A storage backend that uses a permanent file on the local file system.
+
+    This backend is straightforward, directly using a specified path to store the
+    DuckDB database file. It is suitable for development, testing, or single-machine
+    deployments where session data needs to persist across server restarts.
+    """
 
     def __init__(self, config: StorageConfig):
-        """Initialize local file backend."""
+        """
+        Initializes the local file backend.
+
+        Args:
+            config: The storage configuration, which must include a `path`.
+        """
         super().__init__(config)
         # Parse the path - could be absolute or relative
         self.storage_path = Path(config.path).expanduser().resolve()
@@ -89,7 +109,12 @@ class TempFileBackend(StorageBackend):
     """Temporary file storage backend for ephemeral persistent sessions."""
 
     def __init__(self, config: StorageConfig):
-        """Initialize temp file backend."""
+        """
+        Initializes the temporary file backend.
+
+        Args:
+            config: The storage configuration.
+        """
         super().__init__(config)
         self.temp_dir: str | None = None
         self.db_file_path: Path | None = None

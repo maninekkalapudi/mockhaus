@@ -1,4 +1,11 @@
-"""CSV format handler with enhanced Snowflake compatibility."""
+"""
+This module provides a specialized handler for CSV file formats.
+
+It defines the `CSVFormatHandler` class, which is responsible for mapping
+Snowflake's rich set of CSV file format properties to their corresponding
+equivalents in DuckDB's `COPY` command options. It handles various options
+like delimiters, headers, quoting, and compression.
+"""
 
 from typing import Any
 
@@ -10,6 +17,7 @@ class CSVFormatHandler(BaseFormatHandler):
 
     @property
     def format_type(self) -> str:
+        """Returns the format type, which is 'CSV'."""
         return "CSV"
 
     def get_default_properties(self) -> dict[str, Any]:
@@ -30,7 +38,15 @@ class CSVFormatHandler(BaseFormatHandler):
         }
 
     def map_to_duckdb_options(self, properties: dict[str, Any]) -> FormatMappingResult:
-        """Map CSV properties to DuckDB options with enhanced compatibility."""
+        """
+        Maps Snowflake CSV properties to DuckDB `COPY` options.
+
+        Args:
+            properties: A dictionary of Snowflake CSV format properties.
+
+        Returns:
+            A `FormatMappingResult` with the mapped DuckDB options and any warnings.
+        """
         options: dict[str, Any] = {"FORMAT": "CSV"}
         warnings: list[str] = []
         ignored_options: list[str] = []

@@ -1,4 +1,11 @@
-"""PARQUET format handler with comprehensive Snowflake option mapping."""
+"""
+This module provides a specialized handler for Parquet file formats.
+
+It defines the `ParquetFormatHandler` class, which is responsible for mapping
+Snowflake's Parquet file format properties to their corresponding equivalents
+in DuckDB's `COPY` command options. It handles options such as compression and
+binary data representation.
+"""
 
 from typing import Any
 
@@ -22,7 +29,15 @@ class ParquetFormatHandler(BaseFormatHandler):
         }
 
     def map_to_duckdb_options(self, properties: dict[str, Any]) -> FormatMappingResult:
-        """Map PARQUET properties to DuckDB options."""
+        """
+        Maps Snowflake Parquet properties to DuckDB `COPY` options.
+
+        Args:
+            properties: A dictionary of Snowflake Parquet format properties.
+
+        Returns:
+            A `FormatMappingResult` with the mapped DuckDB options and any warnings.
+        """
         options: dict[str, Any] = {"FORMAT": "PARQUET"}
         warnings: list[str] = []
         ignored_options: list[str] = []

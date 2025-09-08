@@ -24,21 +24,21 @@ console = Console()
 @click.group()
 @click.version_option()
 def main() -> None:
-    """Mockhaus - Snowflake proxy with DuckDB backend."""
+    """Mockhaus - A Snowflake-compatible SQL engine powered by DuckDB."""
     pass
 
 
 @main.command()
-@click.option("--host", default="localhost", help="Host to bind server")
-@click.option("--port", default=8080, type=int, help="Port to bind server")
-@click.option("--database", "-d", default=None, help="Database file (ignored in server mode)")
-@click.option("--daemon", is_flag=True, help="Run as daemon")
+@click.option("--host", default="localhost", help="Host to bind the server to.")
+@click.option("--port", default=8080, type=int, help="Port to bind the server to.")
+@click.option("--database", "-d", default=None, help="Database file (ignored in server mode).")
+@click.option("--daemon", is_flag=True, help="Run the server as a daemon (background process).")
 def serve(host: str, port: int, database: str | None, daemon: bool) -> None:  # noqa: ARG001
-    """Start Mockhaus HTTP server."""
+    """Starts the Mockhaus HTTP server for remote connections."""
     try:
         import uvicorn
     except ImportError:
-        console.print("[red]Error: uvicorn not installed. Run: uv sync[/red]")
+        console.print("[red]Error: uvicorn is not installed. Run: uv sync[/red]")
         return
 
     console.print(f"[green]Starting Mockhaus server at http://{host}:{port}[/green]")
@@ -56,12 +56,12 @@ def serve(host: str, port: int, database: str | None, daemon: bool) -> None:  # 
 
 
 @main.command()
-@click.option("--session-type", default="memory", type=click.Choice(["memory", "persistent"]), help="Session type")
-@click.option("--session-id", help="Specific session ID to use")
-@click.option("--session-ttl", type=int, help="Session TTL in seconds")
-@click.option("--persistent-path", help="Path for persistent session storage")
+@click.option("--session-type", default="memory", type=click.Choice(["memory", "persistent"]), help="The type of session to start.")
+@click.option("--session-id", help="A specific session ID to connect to.")
+@click.option("--session-ttl", type=int, help="Session Time-To-Live in seconds.")
+@click.option("--persistent-path", help="The file system path for persistent session storage.")
 def repl(session_type: str, session_id: str | None, session_ttl: int | None, persistent_path: str | None) -> None:
-    """Start interactive REPL client."""
+    """Starts the interactive REPL client to connect to the Mockhaus server."""
     try:
         # Import the enhanced REPL directly
         from .repl.enhanced_repl import main as enhanced_repl_main
@@ -77,15 +77,15 @@ def repl(session_type: str, session_id: str | None, session_ttl: int | None, per
 # Create a command group for stage management
 @main.group()
 def history() -> None:
-    """Manage query history."""
+    """Provides commands to manage and view the query history."""
     pass
 
 
 @history.command("recent")
-@click.option("--limit", "-n", default=10, help="Number of queries to show")
-@click.option("--verbose", "-v", is_flag=True, help="Show full query text")
+@click.option("--limit", "-n", default=10, help="The number of recent queries to show.")
+@click.option("--verbose", "-v", is_flag=True, help="Show the full query text without truncation.")
 def history_recent(limit: int, verbose: bool) -> None:
-    """Show recent query history."""
+    """Shows the most recent queries from the history."""
     history = QueryHistory()
 
     try:
@@ -131,13 +131,13 @@ def history_recent(limit: int, verbose: bool) -> None:
 
 
 @history.command("search")
-@click.option("--text", "-t", help="Search text in queries")
-@click.option("--status", "-s", type=click.Choice(["SUCCESS", "ERROR"]), help="Filter by status")
-@click.option("--type", "-y", help="Filter by query type (SELECT, INSERT, etc)")
-@click.option("--days", "-d", default=7, help="Search last N days")
-@click.option("--limit", "-n", default=20, help="Maximum results to show")
+@click.option("--text", "-t", help="Text to search for in queries.")
+@click.option("--status", "-s", type=click.Choice(["SUCCESS", "ERROR"]), help="Filter by query status.")
+@click.option("--type", "-y", help="Filter by query type (e.g., SELECT, INSERT).")
+@click.option("--days", "-d", default=7, help="Number of past days to search.")
+@click.option("--limit", "-n", default=20, help="Maximum number of results to show.")
 def history_search(text: str, status: str, type: str, days: int, limit: int) -> None:
-    """Search query history."""
+    """Searches the query history with various filters."""
     history = QueryHistory()
 
     try:
@@ -183,7 +183,7 @@ def history_search(text: str, status: str, type: str, days: int, limit: int) -> 
 @history.command("show")
 @click.argument("query_id")
 def history_show(query_id: str) -> None:
-    """Show details of a specific query."""
+    """Shows the detailed information for a specific query by its ID."""
     history = QueryHistory()
 
     try:
@@ -242,9 +242,9 @@ def history_show(query_id: str) -> None:
 
 
 @history.command("stats")
-@click.option("--days", "-d", default=1, help="Show stats for last N days")
+@click.option("--days", "-d", default=1, help="Number of past days to show statistics for.")
 def history_stats(days: int) -> None:
-    """Show query statistics."""
+    """Shows aggregated statistics about the query history."""
     history = QueryHistory()
 
     try:
@@ -303,10 +303,10 @@ def history_stats(days: int) -> None:
 
 
 @history.command("clear")
-@click.option("--before", "-b", help="Clear queries before this date (YYYY-MM-DD)")
-@click.option("--force", "-f", is_flag=True, help="Skip confirmation")
+@click.option("--before", "-b", help="Clear queries before this date (YYYY-MM-DD).")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation prompt.")
 def history_clear(before: str, force: bool) -> None:
-    """Clear query history."""
+    """Clears the query history, with an option to specify a cutoff date."""
     history = QueryHistory()
 
     try:
@@ -344,11 +344,11 @@ def history_clear(before: str, force: bool) -> None:
 
 
 @history.command("export")
-@click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="Export format")
-@click.option("--output", "-o", required=True, help="Output file path")
-@click.option("--days", "-d", default=7, help="Export last N days")
+@click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="The export format.")
+@click.option("--output", "-o", required=True, help="The output file path.")
+@click.option("--days", "-d", default=7, help="Number of past days to export.")
 def history_export(format: str, output: str, days: int) -> None:
-    """Export query history."""
+    """Exports the query history to a file in JSON or CSV format."""
     history = QueryHistory()
 
     try:

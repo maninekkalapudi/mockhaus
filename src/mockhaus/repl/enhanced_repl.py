@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""Enhanced interactive REPL client for Mockhaus server using prompt_toolkit."""
+"""
+This module provides an enhanced interactive REPL client for the Mockhaus server.
+
+It uses the `prompt_toolkit` library to offer advanced features like syntax
+highlighting, autocompletion, command history, and custom key bindings, providing
+a rich, user-friendly command-line experience. If `prompt_toolkit` is not
+available, it gracefully falls back to a basic multi-line input mechanism.
+
+The `EnhancedMockhausClient` class handles communication with the Mockhaus server
+API, managing sessions and executing queries. The `main` function orchestrates
+the REPL loop, command parsing, and result formatting.
+"""
 # ruff: noqa: T201
 
 import os
@@ -23,7 +34,14 @@ except ImportError:
 
 
 class EnhancedMockhausClient:
-    """Enhanced HTTP client for Mockhaus server with advanced terminal features."""
+    """
+    An enhanced HTTP client for the Mockhaus server, featuring advanced terminal
+    capabilities for an interactive REPL experience.
+
+    This client manages the session lifecycle with the server, sends queries,
+    and is configured with `prompt_toolkit` for features like autocompletion
+    and persistent command history.
+    """
 
     def __init__(
         self,
@@ -56,7 +74,10 @@ class EnhancedMockhausClient:
 
     def initialize_session(self) -> bool:
         """
-        Initialize the session at startup.
+        Initializes the session with the server at startup.
+
+        It either connects to an existing session if a `session_id` is provided
+        or creates a new one based on the client's configuration.
 
         Returns:
             True if session was created/connected successfully
@@ -347,7 +368,11 @@ class EnhancedMockhausClient:
 
 def format_results(result: dict) -> str:
     """
-    Format query results for display.
+    Formats query results for display in a tabular format.
+
+    It dynamically calculates column widths to create a well-aligned table.
+    For large result sets, it truncates the output and indicates the number
+    of remaining rows.
 
     Args:
         result: Query result dictionary from server
@@ -457,7 +482,14 @@ def print_help() -> None:
 
 def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | None = None) -> str:
     """
-    Fallback multi-line input for when prompt_toolkit is not available.
+    A fallback multi-line input handler for when `prompt_toolkit` is not available.
+
+    Args:
+        prompt: The base prompt string.
+        current_db: The name of the current database to display in the prompt.
+
+    Returns:
+        The complete user input string.
     """
     lines: list[str] = []
 
@@ -494,7 +526,18 @@ def get_multi_line_input_basic(prompt: str = "mockhaus> ", current_db: str | Non
 
 
 def main(session_type: str = "memory", session_id: str | None = None, session_ttl: int | None = None, persistent_path: str | None = None) -> None:
-    """Enhanced interactive REPL for Mockhaus."""
+    """
+    The main function for the enhanced interactive REPL for Mockhaus.
+
+    It initializes the client, establishes a connection to the server, and enters
+    the main loop to read user input, execute commands, and display results.
+
+    Args:
+        session_type: The type of session to create.
+        session_id: An existing session ID to connect to.
+        session_ttl: The TTL for a new session.
+        persistent_path: The storage path for a persistent session.
+    """
     # Print fancy banner
     print_repl_banner()
     

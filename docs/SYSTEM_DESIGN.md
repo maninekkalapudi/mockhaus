@@ -163,3 +163,35 @@ Executor
 CLI
   | Display rows loaded
 ```
+
+## 4. Detailed Component Guides
+
+This section provides a more in-depth look at specific components and their roles within the Mockhaus architecture.
+
+### 4.1. Server and Session Management
+
+The HTTP server provides a persistent, multi-user interface to Mockhaus.
+
+*   **Application (`server/app.py`):** The main FastAPI application file. It sets up the routes, middleware, and global state for the server.
+*   **Session Management (`server/concurrent_session_manager.py`):** A key component for multi-tenancy. It manages active user sessions, ensuring that each user interacts with their own isolated DuckDB database and state. It handles session creation, expiration, and retrieval.
+*   **Session Context (`server/session_context.py`):** A context manager that ensures each incoming API request is associated with the correct session. It uses a `ContextVar` to hold the current session ID, making it accessible throughout the request lifecycle without needing to pass it explicitly through function calls.
+*   **Global State (`server/state.py`):** Holds the application-level state, primarily the `ConcurrentSessionManager` instance. This makes the session manager accessible to all API endpoints.
+
+### 4.2. Database Management
+
+*   **Database Manager (`snowflake/database_manager.py`):** This component abstracts the management of multiple databases within a single Mockhaus session. It handles `USE DATABASE` and `USE SCHEMA` commands, tracking the current database and schema for the session. All tables created are associated with the active database and schema, emulating Snowflake's namespace behavior.
+
+### 4.3. Query History
+
+*   **History (`query_history/history.py`):** Provides persistent storage for all queries executed through Mockhaus. It uses a dedicated table within the main DuckDB database to store the SQL text, execution status (success or failure), and a timestamp for each query. This is useful for debugging and auditing.
+
+### 4.4. Interactive REPL
+
+*   **Enhanced REPL (`repl/enhanced_repl.py`):** An interactive command-line interface for Mockhaus. It uses the `prompt_toolkit` library to provide features like syntax highlighting, autocompletion, and command history, offering a richer user experience than a simple input loop.
+
+### 4.5. Custom SQLGlot Dialects
+
+*   **Custom Dialects (`sqlglot/dialects/`):** Mockhaus extends `sqlglot`'s standard Snowflake and DuckDB dialects to handle SQL features and syntax that are not covered by the base library.
+    *   `custom_snowflake.py`: Adds parsing for Snowflake-specific commands or functions.
+    *   `custom_duckdb.py`: Defines how certain Snowflake features should be translated or generated in DuckDB-compatible SQL.
+    *   `expressions.py`: Contains custom expression classes that are used in the translation process.

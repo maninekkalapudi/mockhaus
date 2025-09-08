@@ -1,1 +1,1 @@
-"""Custom SQLGlot extensions for Mockhaus."""
+"""Custom SQLGlot dialects subpackage."""

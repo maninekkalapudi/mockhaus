@@ -19,7 +19,11 @@ from mockhaus.my_logging import debug_log
 class SnowflakeASTParser:
     """
     A parser for Snowflake-specific SQL statements that uses `sqlglot` to
-    generate and analyze the Abstract Syntax Tree (AST).
+    generate and analyze an Abstract Syntax Tree (AST).
+
+    This class provides methods to deconstruct complex DDL and DML statements
+    into their constituent parts, which can then be used by other components
+    to emulate Snowflake's behavior.
     """
 
     def __init__(self) -> None:
@@ -50,6 +54,7 @@ class SnowflakeASTParser:
             stage_name = ast.args.get("this")
             if not stage_name:
                 return {"error": "Stage name not found"}
+            stage_name = stage_name_node.name
 
             # Convert to string if it's an Identifier
             stage_name = stage_name.name if hasattr(stage_name, "name") else str(stage_name)
@@ -429,7 +434,16 @@ class SnowflakeASTParser:
 
     def _parse_copy_into_manual(self, sql: str) -> dict[str, Any]:
         """
-        Manual parsing of COPY INTO statement with improved regex patterns.
+        A fallback manual parser for `COPY INTO` statements using regex.
+
+        This is used if the primary AST-based parsing fails, providing more
+        resilience for complex or non-standard `COPY INTO` syntax.
+
+        Args:
+            sql: The SQL string to parse.
+
+        Returns:
+            A dictionary containing the parsed components.
         """
         try:
             import re

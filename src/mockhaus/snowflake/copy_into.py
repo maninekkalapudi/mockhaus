@@ -21,6 +21,9 @@ class CopyIntoContext:
     """
     A data class to hold the parsed components of a `COPY INTO` statement.
 
+    This structure is used to pass the deconstructed parts of the `COPY INTO`
+    command between parsing and translation steps.
+
     Attributes:
         table_name: The name of the target table for the COPY operation.
         stage_reference: The full stage reference (e.g., '@my_stage/data.csv').
@@ -47,16 +50,36 @@ class CopyIntoContext:
 
 
 class CopyIntoTranslator:
-    """Translates Snowflake `COPY INTO` statements to DuckDB `COPY` statements."""
+    """
+    Translates Snowflake `COPY INTO` statements to DuckDB `COPY` statements.
+
+    This class integrates with the stage and file format managers to resolve
+    references and correctly configure the DuckDB `COPY` command based on the
+    options specified in the original Snowflake statement.
+    """
 
     def __init__(self, stage_manager: MockStageManager, format_manager: MockFileFormatManager) -> None:
-        """Initialize COPY INTO translator."""
+        """
+        Initializes the `COPY INTO` translator.
+
+        Args:
+            stage_manager: An instance of `MockStageManager` to resolve stage paths.
+            format_manager: An instance of `MockFileFormatManager` to resolve file formats.
+        """
         self.stage_manager = stage_manager
         self.format_manager = format_manager
         self.ast_parser = SnowflakeASTParser()
 
     def parse_copy_into_statement(self, sql: str) -> CopyIntoContext:
-        """Parse a COPY INTO statement and extract components."""
+        """
+        Parses a `COPY INTO` statement and returns a structured context object.
+
+        Args:
+            sql: The `COPY INTO` SQL statement string.
+
+        Returns:
+            A `CopyIntoContext` object with the parsed components.
+        """
         return self._parse_copy_into_with_ast(sql)
 
     def _parse_copy_into_with_ast(self, sql: str) -> CopyIntoContext:
@@ -95,8 +118,15 @@ class CopyIntoTranslator:
         return context
 
     def translate_copy_into(self, sql: str) -> str:
-        """Translate a COPY INTO statement to DuckDB COPY statement."""
-        # Parse the COPY INTO statement
+        """
+        Translates a Snowflake `COPY INTO` statement into a DuckDB `COPY` statement.
+
+        Args:
+            sql: The `COPY INTO` SQL statement string.
+
+        Returns:
+            A DuckDB-compatible `COPY` statement string.
+        """
         debug_log(f"Translating COPY INTO statement: {sql}")
         context = self.parse_copy_into_statement(sql)
         debug_log(f"Parsed COPY INTO context: {context}")

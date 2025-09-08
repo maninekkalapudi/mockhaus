@@ -1,4 +1,11 @@
-"""Refactored file format manager using modular handlers."""
+"""
+This module defines the manager for Snowflake file formats.
+
+It provides the `MockFileFormatManager` class, which handles the creation,
+retrieval, and management of file formats. It uses a modular, registry-based
+system to delegate the specifics of each format type (e.g., CSV, JSON, Parquet)
+to dedicated handler classes. This makes the system extensible to new formats.
+"""
 
 import hashlib
 import json
@@ -20,10 +27,21 @@ format_registry.register("PARQUET", ParquetFormatHandler)
 
 
 class MockFileFormatManager:
-    """Refactored file format manager using modular handlers."""
+    """
+    Manages Snowflake file formats using a modular, handler-based approach.
+
+    This class is responsible for creating, storing, and retrieving file format
+    definitions. It interacts with a registry of format handlers to validate
+    properties and map them to DuckDB-compatible options for `COPY` statements.
+    """
 
     def __init__(self, connection: duckdb.DuckDBPyConnection) -> None:
-        """Initialize file format manager with DuckDB connection."""
+        """
+        Initializes the file format manager.
+
+        Args:
+            connection: An active DuckDB connection for storing format metadata.
+        """
         self.connection = connection
         self._create_system_tables()
         self._create_default_formats()
@@ -68,7 +86,18 @@ class MockFileFormatManager:
                 self.create_format(name, format_type, properties)
 
     def map_to_duckdb_options(self, file_format: FileFormat) -> dict[str, Any]:
-        """Map Snowflake file format properties to DuckDB COPY options."""
+        """
+        Maps Snowflake file format properties to DuckDB `COPY` command options.
+
+        This method delegates the mapping logic to the appropriate format handler
+        registered for the file format's type.
+
+        Args:
+            file_format: The `FileFormat` object to map.
+
+        Returns:
+            A dictionary of DuckDB-compatible `COPY` options.
+        """
         try:
             handler = format_registry.get_handler(file_format.format_type)
             result = handler.map_to_duckdb_options(file_format.properties)
@@ -90,7 +119,20 @@ class MockFileFormatManager:
             return {"FORMAT": file_format.format_type}
 
     def create_format(self, name: str, format_type: str, properties: dict[str, Any] | None = None) -> FileFormat:
-        """Create a new file format using format handlers."""
+        """
+        Creates a new file format, validates its properties, and stores it.
+
+        Args:
+            name: The name of the file format.
+            format_type: The type of the format (e.g., 'CSV', 'JSON').
+            properties: A dictionary of properties for the format.
+
+        Returns:
+            A `FileFormat` object representing the new format.
+        
+        Raises:
+            ValueError: If the format type is unsupported or properties are invalid.
+        """
         if properties is None:
             properties = {}
 
@@ -130,7 +172,15 @@ class MockFileFormatManager:
         self.connection.execute(insert_sql, [file_format.name, file_format.format_type, json.dumps(file_format.properties)])
 
     def get_format(self, name: str) -> FileFormat | None:
-        """Get file format by name."""
+        """
+        Retrieves a file format by its name.
+
+        Args:
+            name: The name of the file format.
+
+        Returns:
+            A `FileFormat` object if found, otherwise None.
+        """
         result = self.connection.execute("SELECT * FROM mockhaus_file_formats WHERE name = ?", [name]).fetchone()
 
         if not result:
@@ -139,7 +189,12 @@ class MockFileFormatManager:
         return FileFormat(name=result[0], format_type=result[1], properties=json.loads(result[2]) if result[2] else {}, created_at=result[3])
 
     def list_formats(self) -> list[FileFormat]:
-        """List all file formats."""
+        """
+        Lists all created file formats.
+
+        Returns:
+            A list of `FileFormat` objects.
+        """
         results = self.connection.execute("SELECT * FROM mockhaus_file_formats").fetchall()
         formats = []
 
@@ -151,7 +206,15 @@ class MockFileFormatManager:
         return formats
 
     def drop_format(self, name: str) -> bool:
-        """Drop a file format."""
+        """
+        Drops a file format by its name.
+
+        Args:
+            name: The name of the file format to drop.
+
+        Returns:
+            True if the format was dropped, False if it was not found.
+        """
         if not self.get_format(name):
             return False
 

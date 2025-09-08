@@ -1,4 +1,11 @@
-"""Custom DuckDB dialect for handling Snowflake-specific functions."""
+"""
+This module defines a custom DuckDB dialect for `sqlglot`.
+
+It extends the standard DuckDB dialect to provide custom SQL generation logic
+for Snowflake-specific functions that have been parsed by the `CustomSnowflake`
+dialect. This is where the translation from a Snowflake function call to its
+DuckDB equivalent happens.
+"""
 
 from sqlglot import expressions as exp
 from sqlglot.dialects.duckdb import DuckDB
@@ -7,120 +14,87 @@ from .expressions import IdentifierFunc, Sysdate
 
 
 class CustomDuckDBGenerator(DuckDB.Generator):
-    """Extended DuckDB SQL generator that knows how to handle Snowflake functions."""
+    """
+    An extended DuckDB SQL generator that knows how to translate custom expressions
+    parsed from Snowflake SQL, such as `Sysdate` and `IdentifierFunc`.
+    """
 
     def sysdate_sql(self, expression: Sysdate) -> str:
         """
-        Generate DuckDB SQL for Snowflake's SYSDATE() function.
+        Generates the DuckDB SQL for Snowflake's `SYSDATE()` function.
 
-        SYSDATE() in Snowflake returns current UTC timestamp.
-        In DuckDB, we translate this to CURRENT_TIMESTAMP AT TIME ZONE 'UTC'.
+        Snowflake's `SYSDATE()` returns the current timestamp in UTC. The DuckDB
+        equivalent is `CURRENT_TIMESTAMP AT TIME ZONE 'UTC'`.
 
-        For CREATE TABLE DEFAULT clauses, we need to wrap complex expressions
-        in parentheses for proper SQL syntax.
+        Args:
+            expression: The `Sysdate` expression node from the AST.
+
+        Returns:
+            The translated SQL string for DuckDB.
         """
-        # Create the AT TIME ZONE expression
         utc_expr = "CURRENT_TIMESTAMP AT TIME ZONE 'UTC'"
-
-        # Check if we need parentheses based on context
+        # In contexts like CREATE TABLE DEFAULT, complex expressions need parentheses.
         if self._needs_parentheses_for_sysdate(expression):
             return f"({utc_expr})"
-
         return utc_expr
 
     def _needs_parentheses_for_sysdate(self, expression: Sysdate) -> bool:
         """
-        Determine if SYSDATE translation needs parentheses.
+        Determines if the `SYSDATE` translation needs to be wrapped in parentheses.
 
-        We need parentheses in CREATE TABLE DEFAULT clauses where
-        complex expressions like 'AT TIME ZONE' need to be wrapped.
+        This is typically required when the function is used as a default value in
+        a `CREATE TABLE` statement, as the `AT TIME ZONE` clause makes it a
+        complex expression.
+
+        Args:
+            expression: The `Sysdate` expression node.
+
+        Returns:
+            True if parentheses are needed, False otherwise.
         """
-        # Walk up the parent chain to check context
-        current: exp.Expression = expression
-        depth = 0
-        max_depth = 10  # Prevent infinite loops
-
-        while hasattr(current, "parent") and current.parent and depth < max_depth:
-            current = current.parent
-            depth += 1
-
-            # Check if we're in a CREATE statement
-            if isinstance(current, exp.Create):
-                return True
-
-            # Check if we're in a column definition with a default
+        # Walk up the AST to see if the expression is inside a ColumnDef.
+        current = expression.parent
+        while current:
             if isinstance(current, exp.ColumnDef):
                 return True
-
+            current = current.parent
         return False
 
     def identifierfunc_sql(self, expression: IdentifierFunc) -> str:
         """
-        Generate DuckDB SQL for Snowflake's IDENTIFIER() function.
+        Generates the DuckDB SQL for Snowflake's `IDENTIFIER()` function.
 
-        For DuckDB, converts IDENTIFIER('literal') to a plain identifier.
-        For non-literals, falls back to function call syntax (which may error).
+        For DuckDB, this translates `IDENTIFIER('my_table')` into a plain, unquoted
+        identifier `my_table`.
+
+        Args:
+            expression: The `IdentifierFunc` expression node.
+
+        Returns:
+            The translated SQL string.
         """
-        # For DuckDB, convert IDENTIFIER('literal') to identifier if possible
         if isinstance(expression.this, exp.Literal) and expression.this.is_string:
-            # Convert string literal to unquoted identifier
             return str(exp.to_identifier(expression.this.this).sql(dialect=self.dialect))
-
-        # For non-literals (variables, expressions), fallback to function call
-        # This may error in DuckDB, which is appropriate since IDENTIFIER()
-        # is not natively supported
+        # Fallback for non-literals, which will likely error in DuckDB as intended.
         return self.function_fallback_sql(expression)
 
-    def anonymous_sql(self, expression: exp.Anonymous) -> str:
-        """
-        Handle Anonymous functions, including IDENTIFIER() that wasn't caught by parser.
-        """
-        # Handle IDENTIFIER() functions that ended up as Anonymous
-        if expression.this.upper() == "IDENTIFIER":
-            return self.identifierfunc_sql_from_anonymous(expression)
-
-        # For all other anonymous functions, use default behavior
-        return super().anonymous_sql(expression)
-
-    def identifierfunc_sql_from_anonymous(self, expression: exp.Anonymous) -> str:
-        """
-        Convert Anonymous IDENTIFIER() to plain identifier for DuckDB.
-        """
-        # Get the first argument
-        args = expression.expressions
-        if args and len(args) >= 1:
-            arg = args[0]
-            # If it's a string literal, convert to unquoted identifier
-            if isinstance(arg, exp.Literal) and arg.is_string:
-                return str(exp.to_identifier(arg.this).sql(dialect=self.dialect))
-
-        # Fallback for non-literals or no args
-        return super().anonymous_sql(expression)
-
-    # Register the custom transformation
+    # Register the custom transformations for the generator.
     TRANSFORMS = {
         **DuckDB.Generator.TRANSFORMS,
         Sysdate: sysdate_sql,
         IdentifierFunc: identifierfunc_sql,
-        exp.Anonymous: anonymous_sql,
     }
 
 
 class CustomDuckDB(DuckDB):
     """
-    Custom DuckDB dialect that can handle Snowflake-specific functions.
+    A custom `sqlglot` dialect for DuckDB with extended generation capabilities.
 
-    This dialect extends DuckDB to understand how to generate appropriate
-    DuckDB SQL for Snowflake functions like SYSDATE().
+    This dialect uses the `CustomDuckDBGenerator` to correctly translate custom
+    Snowflake expressions into their DuckDB equivalents.
     """
 
     class Generator(CustomDuckDBGenerator):
-        """Generator for custom DuckDB dialect."""
+        """The custom generator for this dialect."""
 
         pass
-
-
-# Convenience function for dialect registration
-def get_duckdb_dialect() -> type[CustomDuckDB]:
-    """Return the custom DuckDB dialect class."""
-    return CustomDuckDB

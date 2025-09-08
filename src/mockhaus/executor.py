@@ -1,4 +1,12 @@
-"""Query execution engine using DuckDB."""
+"""
+This module defines the core query execution engine for Mockhaus.
+
+It contains the `MockhausExecutor` class, which is the central orchestrator for
+receiving Snowflake SQL, determining the statement type, and delegating to the
+appropriate handler for translation and execution. It manages the connection to the
+backend DuckDB database and integrates various components like the SQL translator,
+data ingestion handler, and query history logger.
+"""
 
 import contextlib
 from dataclasses import dataclass
@@ -16,6 +24,9 @@ from .snowflake.database_manager import SnowflakeDatabaseManager
 class QueryResult:
     """
     Represents the result of a query execution.
+
+    This dataclass standardizes the output of all query executions, providing
+    a consistent structure for both successful and failed queries.
 
     Attributes:
         success: Whether the query executed successfully.
@@ -316,13 +327,21 @@ class MockhausExecutor:
 
     def _execute_duckdb_sql(self, duckdb_sql: str) -> dict[str, Any]:
         """
-        Execute a DuckDB SQL query and return results.
+        Executes a DuckDB SQL query and returns the results.
+
+        This is a low-level method that directly interacts with the DuckDB
+        connection. It fetches all results and formats them into a
+        standard dictionary structure.
 
         Args:
             duckdb_sql: The DuckDB SQL query to execute
 
         Returns:
-            Dictionary containing query results
+            A dictionary containing the query results, including data, columns,
+            and row count.
+        
+        Raises:
+            RuntimeError: If not connected to the database.
         """
         if not self._connection:
             raise RuntimeError("Not connected to database")

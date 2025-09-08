@@ -1,4 +1,13 @@
-"""SQL translation engine for converting Snowflake SQL to DuckDB SQL."""
+"""
+This module provides the core SQL translation engine for converting Snowflake
+SQL to DuckDB-compatible SQL.
+
+It defines the `SnowflakeToDuckDBTranslator` class, which leverages the `sqlglot`
+library and custom dialects to parse Snowflake SQL and generate the equivalent
+SQL for DuckDB. This is responsible for handling standard DML and DDL but does
+not handle complex data ingestion statements, which are managed by the
+`SnowflakeIngestionHandler`.
+"""
 
 from typing import Any
 

@@ -1,7 +1,13 @@
-"""FastAPI application setup for Mockhaus server."""
+"""
+This module sets up and configures the main FastAPI application for the Mockhaus server.
+
+It initializes the FastAPI app, sets up the application lifecycle events (lifespan)
+for managing server state, includes all the necessary API routers for different
+endpoints (like query, health, and sessions), and configures middleware for
+CORS, logging, and debugging.
+"""
 
 import os
-import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -17,7 +23,13 @@ from .state import server_state
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    """Manage application lifecycle."""
+    """
+    Manages the application's lifecycle events.
+
+    This context manager handles startup and shutdown logic. On startup, it
+    initializes the server state and prints a startup banner. On shutdown, it
+    gracefully cleans up resources managed by the server state, such as active sessions.
+    """
     # Startup: initialize server state and print banner
     host = os.environ.get("MOCKHAUS_HOST", "0.0.0.0")
     port = int(os.environ.get("MOCKHAUS_PORT", "8080"))
@@ -57,7 +69,12 @@ app.include_router(sessions.router, prefix="/api/v1")
 
 @app.get("/")
 async def root() -> dict[str, str]:
-    """Root endpoint with basic server information."""
+    """
+    Provides a basic root endpoint with server information.
+
+    Returns:
+        A dictionary containing the server name, version, and documentation URL.
+    """
     return {
         "name": "Mockhaus Server",
         "version": "0.3.0",

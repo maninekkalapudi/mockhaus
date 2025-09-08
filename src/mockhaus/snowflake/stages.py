@@ -43,6 +43,11 @@ class Stage:
 class MockStageManager:
     """
     Manages Snowflake stages by mapping them to the local file system.
+
+    This class handles the creation, retrieval, and deletion of stages. It maintains
+    a system table (`mockhaus_stages`) within the DuckDB connection to store
+    metadata about each stage, and it resolves stage references (e.g., `@my_stage`)
+    to their corresponding local directory paths.
     """
 
     def __init__(self, connection: duckdb.DuckDBPyConnection) -> None:

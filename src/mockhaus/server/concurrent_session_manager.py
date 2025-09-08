@@ -1,4 +1,14 @@
-"""Session manager for handling multiple isolated sessions."""
+"""
+This module provides a manager for handling multiple, isolated user sessions.
+
+It defines the `ConcurrentSessionManager`, which is responsible for creating,
+managing, and terminating `SessionContext` objects. Each session provides an
+isolated environment with its own DuckDB database connection and state, allowing
+for concurrent use of the Mockhaus server without interference between users.
+
+The manager handles session lifecycle, including TTL-based expiration, LRU eviction
+under memory pressure, and graceful shutdown.
+"""
 
 import asyncio
 import contextlib
@@ -13,16 +23,23 @@ logger = logging.getLogger(__name__)
 
 
 class ConcurrentSessionManager:
-    """Manages multiple session contexts with isolation."""
+    """
+    Manages multiple concurrent and isolated user sessions.
+
+    This class is the core of the server's multi-tenancy capability. It maintains
+    a dictionary of active sessions, handles session creation with different storage
+    backends, and enforces policies like maximum session limits and TTLs.
+    """
 
     def __init__(self, max_sessions: int = 100, default_ttl: int = 3600, cleanup_interval: int = 300):
         """
-        Initialize session manager.
+        Initializes the session manager.
 
         Args:
-            max_sessions: Maximum number of concurrent sessions
-            default_ttl: Default TTL for sessions in seconds
-            cleanup_interval: Interval in seconds between cleanup runs
+            max_sessions: The maximum number of concurrent sessions allowed.
+            default_ttl: The default time-to-live for sessions in seconds.
+            cleanup_interval: The interval in seconds for the background task
+                              to run and clean up expired sessions.
         """
         self._sessions: dict[str, SessionContext] = {}
         self._sessions_lock = asyncio.Lock()
@@ -41,14 +58,27 @@ class ConcurrentSessionManager:
         storage_config: SessionStorageConfig | None = None,
     ) -> SessionContext:
         """
-        Get an existing session or create a new one.
+        Gets an existing session or creates a new one.
+
+        If a `session_id` is provided and valid, it returns the existing session.
+        Otherwise, it creates a new session with the specified configuration.
+        If the session limit is reached, it attempts to clean up expired sessions
+        or evict the least recently used one.
 
         Args:
-            session_id: Optional session ID to retrieve
-            ttl_seconds: Optional TTL for new session
+            session_id: An optional ID to retrieve an existing session.
+            ttl_seconds: An optional TTL for a new session.
+            session_type: The type of session to create (in-memory or persistent).
+            storage_config: Configuration for the storage backend if the session
+                            is persistent.
 
         Returns:
-            SessionContext for the session
+            The `SessionContext` for the requested or newly created session.
+
+        Raises:
+            RuntimeError: If the maximum number of sessions is reached and no
+                          session can be evicted.
+            ValueError: If a persistent session is requested without storage config.
         """
         async with self._sessions_lock:
             # If session_id provided, try to get existing session
@@ -98,13 +128,13 @@ class ConcurrentSessionManager:
 
     async def get_session(self, session_id: str) -> SessionContext | None:
         """
-        Get an existing session by ID.
+        Gets an existing session by its ID.
 
         Args:
-            session_id: Session ID to retrieve
+            session_id: The ID of the session to retrieve.
 
         Returns:
-            SessionContext if found and active, None otherwise
+            The `SessionContext` if it is found and active, otherwise None.
         """
         async with self._sessions_lock:
             if session_id in self._sessions:
@@ -177,7 +207,18 @@ class ConcurrentSessionManager:
         return False
 
     async def _create_storage_backend(self, storage_config: SessionStorageConfig) -> StorageBackend:
-        """Create a storage backend based on configuration."""
+        """
+        Creates a storage backend instance based on the provided configuration.
+
+        Args:
+            storage_config: The configuration for the storage backend.
+
+        Returns:
+            An initialized `StorageBackend` instance.
+        
+        Raises:
+            ValueError: If the storage type is unsupported.
+        """
         storage_type = storage_config.type.lower()
 
         # Create storage config for backend
@@ -202,10 +243,13 @@ class ConcurrentSessionManager:
 
     async def _evict_lru_session(self) -> bool:
         """
-        Evict the least recently used session.
+        Evicts the least recently used (LRU) session to make space.
+
+        A session is eligible for eviction only if it is not currently locked
+        (i.e., not in the middle of an operation).
 
         Returns:
-            True if a session was evicted, False otherwise
+            True if a session was successfully evicted, False otherwise.
         """
         if not self._sessions:
             return False
@@ -234,7 +278,9 @@ class ConcurrentSessionManager:
         return False
 
     async def start(self) -> None:
-        """Start the session manager and background tasks."""
+        """
+        Starts the session manager and its background cleanup task.
+        """
         if self._started:
             return
 
@@ -246,7 +292,10 @@ class ConcurrentSessionManager:
         self._cleanup_task = asyncio.create_task(self._background_cleanup())
 
     async def shutdown(self) -> None:
-        """Shutdown all sessions and clean up resources."""
+        """
+        Shuts down the session manager, terminating all active sessions and stopping
+        background tasks.
+        """
         if not self._started:
             return
 
@@ -268,7 +317,9 @@ class ConcurrentSessionManager:
                 await self._remove_session(session_id)
 
     async def _background_cleanup(self) -> None:
-        """Background task to periodically clean up expired sessions."""
+        """
+        A background task that periodically cleans up expired sessions.
+        """
         logger.info("Starting background session cleanup task")
 
         while not self._shutdown_event.is_set():
@@ -298,7 +349,13 @@ class ConcurrentSessionManager:
         logger.info("Background session cleanup task stopped")
 
     def get_stats(self) -> dict:
-        """Get session manager statistics."""
+        """
+        Returns statistics about the session manager's state.
+
+        Returns:
+            A dictionary containing statistics like active sessions, max sessions,
+            and cleanup task status.
+        """
         # Calculate session usage percentage
         usage_percentage = (len(self._sessions) / self._max_sessions * 100) if self._max_sessions > 0 else 0
 
@@ -314,7 +371,13 @@ class ConcurrentSessionManager:
         }
 
     def get_session_details(self) -> list[dict]:
-        """Get detailed information about all sessions for monitoring."""
+        """
+        Returns detailed information about all active sessions for monitoring.
+
+        Returns:
+            A list of dictionaries, where each dictionary contains detailed
+            information about a single session.
+        """
         session_details = []
         for _session_id, context in self._sessions.items():
             info = context.get_info()

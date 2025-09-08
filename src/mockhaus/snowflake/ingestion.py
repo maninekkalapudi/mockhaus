@@ -1,4 +1,11 @@
-"""High-level Snowflake data ingestion operations."""
+"""
+This module provides a high-level handler for Snowflake data ingestion operations.
+
+It defines the `SnowflakeIngestionHandler` class, which acts as a router for various
+data ingestion statements like `CREATE STAGE`, `CREATE FILE FORMAT`, and `COPY INTO`.
+It delegates the parsing and execution of these statements to the appropriate
+specialized managers and translators.
+"""
 
 from typing import Any
 

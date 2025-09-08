@@ -1,4 +1,10 @@
-"""Query execution endpoints."""
+"""
+This module defines the primary query execution endpoint for the Mockhaus server.
+
+It provides the `/query` route, which accepts Snowflake SQL queries, executes
+_them within a session context, and returns the results. This is the main
+entry point for all SQL-related interactions with the server.
+"""
 
 import time
 from typing import Any
@@ -17,22 +23,29 @@ router = APIRouter(tags=["query"])
 @router.post("/query", response_model=QueryResponse, responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}})
 async def execute_query(request: QueryRequest) -> Any:
     """
-    Execute Snowflake SQL query.
+    Executes a Snowflake SQL query within a session context.
 
-    Accepts any valid Snowflake SQL including:
-    - SELECT queries
-    - DDL statements (CREATE STAGE, CREATE FILE FORMAT, etc.)
-    - DML statements (INSERT, UPDATE, DELETE)
-    - Data ingestion (COPY INTO)
+    This endpoint accepts a SQL query and an optional session ID. It uses the
+    global `server_state` to get or create a session, then delegates the query
+    execution to the session's context. This ensures that each query is handled
+    in an isolated environment.
+
+    The endpoint can handle various types of Snowflake SQL, including:
+    - DQL (SELECT statements)
+    - DDL (CREATE, ALTER, DROP statements for tables, stages, etc.)
+    - DML (INSERT, UPDATE, DELETE statements)
+    - Data ingestion commands (e.g., `COPY INTO`)
 
     Args:
-        request: Query request containing SQL and optional database path
+        request: A `QueryRequest` object containing the SQL query and session ID.
 
     Returns:
-        Query execution results with data, execution time, and translated SQL
+        A `QueryResponse` object with the execution results, including data,
+        execution time, and the translated SQL.
 
     Raises:
-        HTTPException: 400 for SQL execution errors, 500 for server errors
+        HTTPException: A 400 error for SQL execution-related issues, or a 500
+                       error for unexpected internal server errors.
     """
     start_time = time.time()
 
@@ -56,6 +69,7 @@ async def execute_query(request: QueryRequest) -> Any:
                 session_id=result["session_id"],
                 current_database=None,  # TODO: Add database tracking to session
             )
+        # If the execution failed, raise an HTTPException with details.
         raise HTTPException(
             status_code=400,
             detail={
@@ -70,6 +84,7 @@ async def execute_query(request: QueryRequest) -> Any:
         # Re-raise HTTP exceptions as-is
         raise
     except Exception as e:
+        # Catch any other unexpected errors and return a 500 response.
         raise HTTPException(
             status_code=500,
             detail={

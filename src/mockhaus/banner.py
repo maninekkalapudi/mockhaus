@@ -1,4 +1,10 @@
-"""ASCII banner and branding for Mockhaus."""
+"""
+This module defines the ASCII art banners and welcome messages for Mockhaus.
+
+It provides functions to print styled and colored banners for different
+application modes (e.g., REPL, server). It uses `colorama` for cross-platform
+colored output, with a graceful fallback if the library is not installed.
+"""
 
 import sys
 from typing import Optional
@@ -52,7 +58,16 @@ Server ready! API documentation available at /docs
 
 
 def get_colored_banner(banner_text: str, color: Optional[str] = None) -> str:
-    """Apply color to banner if colorama is available."""
+    """
+    Applies color to the banner text if colorama is available.
+
+    Args:
+        banner_text: The text of the banner.
+        color: The desired color name (e.g., 'cyan', 'green').
+
+    Returns:
+        The colored banner text, or the original text if color is not supported.
+    """
     if not HAS_COLOR or not color:
         return banner_text
 
@@ -72,11 +87,11 @@ def get_colored_banner(banner_text: str, color: Optional[str] = None) -> str:
 
 def print_banner(mode: str = 'full', color: Optional[str] = 'cyan') -> None:
     """
-    Print the Mockhaus banner.
+    Prints the Mockhaus banner to stderr.
 
     Args:
-        mode: 'full' for detailed ASCII art, 'simple' for basic text
-        color: Color name ('cyan', 'green', 'yellow', 'blue', 'magenta', 'red', 'white')
+        mode: The banner style to use ('full' for ASCII art, 'simple' for basic text).
+        color: The color to apply to the banner.
     """
     if mode == 'full':
         banner_text = BANNER.format(duckdb_version=DUCKDB_VERSION)
@@ -88,13 +103,25 @@ def print_banner(mode: str = 'full', color: Optional[str] = 'cyan') -> None:
 
 
 def print_repl_banner(color: Optional[str] = 'cyan') -> None:
-    """Print banner for REPL mode."""
+    """
+    Prints the specific banner and welcome message for REPL mode.
+
+    Args:
+        color: The color to apply to the banner.
+    """
     print_banner('full', color)
     print(get_colored_banner(REPL_WELCOME, 'green'), file=sys.stderr)
 
 
 def print_server_banner(host: str = '0.0.0.0', port: int = 8080, color: Optional[str] = 'cyan') -> None:
-    """Print banner for server mode."""
+    """
+    Prints the specific banner and welcome message for server mode.
+
+    Args:
+        host: The host the server is running on.
+        port: The port the server is running on.
+        color: The color to apply to the banner.
+    """
     print_banner('full', color)
     server_info = f"Starting server on http://{host}:{port}"
     print(get_colored_banner(server_info, 'green'), file=sys.stderr)

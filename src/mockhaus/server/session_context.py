@@ -1,4 +1,12 @@
-"""Session context for isolated DuckDB connections."""
+"""
+This module defines the context for a single, isolated user session.
+
+It contains the `SessionContext` class, which encapsulates a `MockhausExecutor`
+instance, a session configuration, and an optional storage backend. Each session
+runs in its own context, ensuring that database connections, transactions, and
+state are not shared between concurrent users. It also manages the lifecycle
+of the executor and handles thread-safe execution of SQL queries.
+"""
 
 import asyncio
 import contextlib
@@ -13,10 +21,25 @@ logger = logging.getLogger(__name__)
 
 
 class SessionContext:
-    """Context for a single session with isolated DuckDB connection."""
+    """
+    Manages the context for a single user session, providing an isolated
+    environment with its own DuckDB connection and state.
+
+    This class is responsible for creating and managing a `MockhausExecutor`
+    instance that is unique to the session. It handles both in-memory and
+    persistent sessions, using a storage backend to manage the database file
+    for the latter. All operations within the session are protected by an
+    asynchronous lock to ensure thread safety.
+    """
 
     def __init__(self, config: SessionConfig, storage_backend: StorageBackend | None = None):
-        """Initialize session context with configuration."""
+        """
+        Initializes the session context.
+
+        Args:
+            config: The configuration object for the session.
+            storage_backend: An optional storage backend for persistent sessions.
+        """
         self.config = config
         self.storage_backend = storage_backend
         self.lock = asyncio.Lock()  # For thread safety
@@ -26,11 +49,20 @@ class SessionContext:
 
     @property
     def session_id(self) -> str:
-        """Get session ID."""
+        """Returns the unique identifier for the session."""
         return self.config.session_id
 
     async def get_executor(self) -> MockhausExecutor:
-        """Get or create the executor for this session."""
+        """
+        Gets or creates the `MockhausExecutor` for this session.
+
+        If the executor has not yet been created, this method initializes it,
+        connecting to either an in-memory database or a persistent file based
+        on the session's configuration.
+
+        Returns:
+            The `MockhausExecutor` instance for this session.
+        """
         if self._executor is None:
             # Create isolated executor for this session
             self._executor = MockhausExecutor()
@@ -57,7 +89,19 @@ class SessionContext:
         return self._executor
 
     async def execute_sql(self, sql: str) -> dict[str, Any]:
-        """Execute SQL in this session's context with thread safety."""
+        """
+        Executes a SQL query within this session's context with thread safety.
+
+        This method acquires a lock to ensure that only one operation can be
+        performed at a time within the session. It updates the session's last
+        accessed time and handles syncing data to storage for persistent sessions.
+
+        Args:
+            sql: The SQL query string to execute.
+
+        Returns:
+            A dictionary containing the result of the execution.
+        """
         async with self.lock:
             # Update last accessed time
             self.config.update_last_accessed()
@@ -105,7 +149,12 @@ class SessionContext:
         return self._is_active and not self.is_expired()
 
     async def close(self) -> None:
-        """Close the session and cleanup resources."""
+        """
+        Closes the session and cleans up all associated resources.
+
+        This includes syncing any final data for persistent sessions, disconnecting
+        the database executor, and cleaning up the storage backend.
+        """
         async with self.lock:
             self._is_active = False
 
@@ -132,7 +181,12 @@ class SessionContext:
                     logger.error(f"Session {self.session_id}: Failed to cleanup storage: {e}")
 
     def get_info(self) -> dict[str, Any]:
-        """Get session information."""
+        """
+        Returns a dictionary with information about the session.
+
+        Returns:
+            A dictionary containing the session's configuration and active status.
+        """
         info = self.config.to_dict()
         info["is_active"] = self._is_active
         return info

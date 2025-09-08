@@ -1,4 +1,11 @@
-"""Base classes for file format handlers."""
+"""
+This module defines the base classes and data models for file format handlers.
+
+It provides the `BaseFormatHandler` abstract class, which defines the common
+interface for all format-specific handlers (e.g., for CSV, JSON). It also
+defines dataclasses like `FileFormat`, `FormatMappingResult`, and
+`ValidationResult` to structure the data used in the format management system.
+"""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -7,7 +14,15 @@ from typing import Any
 
 @dataclass
 class FileFormat:
-    """Represents a Snowflake file format in Mockhaus."""
+    """
+    Represents a Snowflake file format and its properties within Mockhaus.
+
+    Attributes:
+        name: The unique name of the file format.
+        format_type: The type of the format (e.g., 'CSV', 'JSON', 'PARQUET').
+        properties: A dictionary of properties that define the format's behavior.
+        created_at: The timestamp when the format was created.
+    """
 
     name: str
     format_type: str  # 'CSV', 'JSON', 'PARQUET', 'AVRO', 'ORC', 'XML'
@@ -17,7 +32,15 @@ class FileFormat:
 
 @dataclass
 class FormatMappingResult:
-    """Result of mapping Snowflake format properties to DuckDB options."""
+    """
+    Represents the result of mapping Snowflake format properties to DuckDB options.
+
+    Attributes:
+        options: A dictionary of DuckDB-compatible `COPY` command options.
+        warnings: A list of warnings generated during the mapping process.
+        ignored_options: A list of Snowflake options that were ignored because
+                         they have no equivalent in DuckDB.
+    """
 
     options: dict[str, Any]
     warnings: list[str] = field(default_factory=list)
@@ -26,7 +49,14 @@ class FormatMappingResult:
 
 @dataclass
 class ValidationResult:
-    """Result of validating format properties."""
+    """
+    Represents the result of validating a set of file format properties.
+
+    Attributes:
+        is_valid: A boolean indicating if the properties are valid.
+        errors: A list of validation error messages.
+        warnings: A list of validation warning messages.
+    """
 
     is_valid: bool
     errors: list[str] = field(default_factory=list)
@@ -34,7 +64,12 @@ class ValidationResult:
 
 
 class BaseFormatHandler(ABC):
-    """Base class for all format handlers."""
+    """
+    An abstract base class for all file format-specific handlers.
+
+    This class defines the contract that all format handlers must follow, ensuring
+    they can be used interchangeably by the `MockFileFormatManager`.
+    """
 
     @property
     @abstractmethod
@@ -49,12 +84,31 @@ class BaseFormatHandler(ABC):
 
     @abstractmethod
     def map_to_duckdb_options(self, properties: dict[str, Any]) -> FormatMappingResult:
-        """Map Snowflake format properties to DuckDB COPY options."""
+        """
+        Maps Snowflake format properties to DuckDB `COPY` command options.
+
+        Args:
+            properties: A dictionary of Snowflake file format properties.
+
+        Returns:
+            A `FormatMappingResult` containing the mapped DuckDB options.
+        """
         pass
 
     def validate_properties(self, properties: dict[str, Any]) -> ValidationResult:
-        """Validate format properties. Default implementation returns valid."""
-        del properties  # Unused parameter
+        """
+        Validates a set of properties for this format type.
+
+        The default implementation considers all properties valid. Subclasses should
+        override this to implement specific validation logic.
+
+        Args:
+            properties: The properties to validate.
+
+        Returns:
+            A `ValidationResult` object.
+        """
+        del properties  # Unused in the default implementation.
         return ValidationResult(is_valid=True)
 
     def _log_warnings(self, warnings: list[str]) -> None:

@@ -1,4 +1,12 @@
-"""Custom Snowflake dialect extending SQLGlot's Snowflake dialect."""
+"""
+This module defines a custom Snowflake dialect for `sqlglot`.
+
+It extends the standard Snowflake dialect to add parsing support for
+Snowflake-specific functions that are not yet included in the base `sqlglot`
+library. This allows these functions to be correctly represented in the
+Abstract Syntax Tree (AST), which can then be translated by the
+`CustomDuckDB` dialect.
+"""
 
 from typing import Any
 
@@ -10,33 +18,39 @@ from .expressions import IdentifierFunc, Sysdate
 
 def _parse_sysdate(_: Any) -> exp.Expression:
     """
-    Parse SYSDATE() function.
+    A parser function for `sqlglot` to handle Snowflake's `SYSDATE()`.
 
-    SYSDATE() in Snowflake takes no arguments and returns current UTC timestamp.
-    Args should be empty for SYSDATE().
+    This function is registered with the parser to create a `Sysdate` expression
+    node when it encounters the `SYSDATE` function call.
+
+    Returns:
+        A `Sysdate` expression node.
     """
     return Sysdate()
 
 
 def _build_identifier_func(args: list) -> exp.Expression:
     """
-    Build IDENTIFIER() function expression.
+    A builder function for `sqlglot` to handle Snowflake's `IDENTIFIER()`.
+
+    This creates an `IdentifierFunc` expression node from the parsed arguments.
 
     Args:
-        args: List of arguments passed to IDENTIFIER()
+        args: The list of arguments parsed from the function call.
 
     Returns:
-        IdentifierFunc expression with the argument
+        An `IdentifierFunc` expression node.
     """
     from sqlglot.helper import seq_get
-
     return IdentifierFunc(this=seq_get(args, 0))
 
 
 class CustomSnowflakeParser(Snowflake.Parser):
-    """Extended Snowflake parser with custom functions."""
+    """
+    An extended Snowflake parser that includes custom function definitions.
+    """
 
-    # Extend the FUNCTIONS dictionary with custom functions
+    # Extend the base Snowflake parser's FUNCTIONS dictionary.
     FUNCTIONS = {
         **Snowflake.Parser.FUNCTIONS,
         "SYSDATE": _parse_sysdate,
@@ -45,18 +59,22 @@ class CustomSnowflakeParser(Snowflake.Parser):
 
 
 class CustomSnowflakeGenerator(Snowflake.Generator):
-    """Extended Snowflake SQL generator with custom function support."""
+    """
+    An extended Snowflake SQL generator to handle the custom expressions.
+
+    This ensures that if we parse and then regenerate Snowflake SQL, the custom
+    functions are written back correctly.
+    """
 
     def sysdate_sql(self, _: Sysdate) -> str:
-        """Generate SQL for SYSDATE() function in Snowflake dialect."""
+        """Generates the SQL for the `SYSDATE()` function."""
         return "SYSDATE()"
 
     def identifierfunc_sql(self, expression: IdentifierFunc) -> str:
-        """Generate SQL for IDENTIFIER() function in Snowflake dialect."""
-        # For Snowflake, always keep as IDENTIFIER() function
+        """Generates the SQL for the `IDENTIFIER()` function."""
         return self.function_fallback_sql(expression)
 
-    # Register custom SQL generators
+    # Register the custom transformations for the generator.
     TRANSFORMS = {
         **Snowflake.Generator.TRANSFORMS,
         Sysdate: sysdate_sql,
@@ -66,25 +84,19 @@ class CustomSnowflakeGenerator(Snowflake.Generator):
 
 class CustomSnowflake(Snowflake):
     """
-    Custom Snowflake dialect with extended function support.
+    A custom `sqlglot` dialect for Snowflake with extended function support.
 
-    This dialect adds support for Snowflake-specific functions that
-    are not yet supported in the main SQLGlot library, starting with
-    SYSDATE().
+    This dialect integrates the custom parser and generator to provide full
+    support for parsing and generating Snowflake-specific functions like
+    `SYSDATE()` and `IDENTIFIER()`.
     """
 
     class Parser(CustomSnowflakeParser):
-        """Parser for custom Snowflake dialect."""
+        """The custom parser for this dialect."""
 
         pass
 
     class Generator(CustomSnowflakeGenerator):
-        """Generator for custom Snowflake dialect."""
+        """The custom generator for this dialect."""
 
         pass
-
-
-# Convenience function for dialect registration
-def get_dialect() -> type[CustomSnowflake]:
-    """Return the custom Snowflake dialect class."""
-    return CustomSnowflake

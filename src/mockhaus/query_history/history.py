@@ -1,4 +1,13 @@
-"""Query history tracking and analysis for Mockhaus."""
+"""
+This module provides query history tracking and analysis for Mockhaus.
+
+It defines the `QueryHistory` class, which manages the storage and retrieval of
+query execution records using dedicated tables within a DuckDB database. This
+allows for auditing, debugging, and performance analysis of executed queries.
+
+The module also defines several dataclasses to structure the query information,
+including `QueryRecord`, `QueryContext`, and `QueryMetrics`.
+"""
 
 import json
 import uuid
@@ -11,7 +20,22 @@ import duckdb
 
 @dataclass
 class QueryContext:
-    """Context information for a query execution."""
+    """
+    Represents the context in which a query is executed.
+
+    This information is used to tag query records in the history for better
+    filtering and analysis, especially in a multi-session or multi-user environment.
+
+    Attributes:
+        session_id: The unique identifier for the user session.
+        connection_id: A unique identifier for the specific connection.
+        database_name: The name of the database the query was executed against.
+        schema_name: The name of the schema in use.
+        user: The user who executed the query.
+        warehouse: The virtual warehouse used (for Snowflake compatibility).
+        client_info: A dictionary of client-provided metadata.
+        query_tags: A dictionary of user-defined tags for the query.
+    """
 
     session_id: str | None = None
     connection_id: str | None = None
@@ -25,7 +49,12 @@ class QueryContext:
 
 @dataclass
 class QueryRecord:
-    """A single query history record."""
+    """
+    Represents a single, comprehensive record of a query execution.
+
+    This dataclass structures all the information about a query that is stored
+    in the `query_history` table.
+    """
 
     id: int
     query_id: str
@@ -50,7 +79,12 @@ class QueryRecord:
 
 @dataclass
 class QueryMetrics:
-    """Performance metrics for a query execution."""
+    """
+    Represents performance metrics associated with a query execution.
+
+    This data is stored in the `query_metrics` table and linked to a `QueryRecord`
+    by the `query_id`.
+    """
 
     query_id: str
     parse_time_ms: int | None = None
@@ -63,7 +97,11 @@ class QueryMetrics:
 
 @dataclass
 class QueryStatistics:
-    """Aggregated statistics for queries."""
+    """
+    Represents aggregated statistics for a set of queries over a time period.
+
+    This is used to provide an overview of system performance and usage.
+    """
 
     total_queries: int
     successful_queries: int
@@ -76,23 +114,38 @@ class QueryStatistics:
 
 
 class QueryHistory:
-    """Manages query history storage and retrieval using DuckDB tables."""
+    """
+    Manages query history storage and retrieval using DuckDB tables.
+
+    This class is responsible for creating the necessary schema and tables for
+    storing query history, recording new queries, and providing methods to
+    search, retrieve, and analyze the historical data.
+    """
 
     SCHEMA_NAME = "__mockhaus__"
 
     def __init__(self, connection: duckdb.DuckDBPyConnection | None = None):
         """
-        Initialize query history.
+        Initializes the QueryHistory manager.
 
         Args:
-            connection: DuckDB connection to use. If None, will be set later.
+            connection: An optional DuckDB connection. If not provided, it must be
+                        set later using the `connect` method.
         """
         self._connection = connection
         self._initialized = False
         self._is_memory_db = False
 
     def connect(self, connection: duckdb.DuckDBPyConnection) -> None:
-        """Set the connection and initialize schema if needed."""
+        """
+        Sets the DuckDB connection and initializes the history schema if needed.
+
+        This method must be called before any other operations if a connection
+        was not provided during initialization.
+
+        Args:
+            connection: The DuckDB connection to use for history storage.
+        """
         if self._connection is None:
             self._connection = connection
             # Check if this is an in-memory database by checking available catalogs
@@ -107,13 +160,18 @@ class QueryHistory:
             self._initialized = True
 
     def _get_schema_name(self) -> str:
-        """Get the full schema name based on database type."""
+        """Returns the full schema name, accounting for in-memory databases."""
         if self._is_memory_db:
             return f"memory.{self.SCHEMA_NAME}"
         return self.SCHEMA_NAME
 
     def _init_schema(self) -> None:
-        """Initialize the history schema and tables."""
+        """
+        Initializes the database schema and tables required for query history.
+
+        Creates the `__mockhaus__` schema, `query_history` and `query_metrics`
+        tables, and associated views if they do not already exist.
+        """
         if not self._connection:
             raise RuntimeError("Not connected to history database")
 
@@ -203,10 +261,19 @@ class QueryHistory:
         error: Exception | None = None,
     ) -> str:
         """
-        Record a query execution.
+        Records a single query execution in the history table.
+
+        Args:
+            original_sql: The original SQL query string.
+            translated_sql: The translated SQL query string, if applicable.
+            context: The context in which the query was executed.
+            execution_time_ms: The time taken for the query to execute.
+            status: The final status of the query (e.g., 'SUCCESS', 'ERROR').
+            rows_affected: The number of rows affected or returned by the query.
+            error: The exception object if the query failed.
 
         Returns:
-            The query_id of the recorded query.
+            The unique `query_id` assigned to this query record.
         """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
@@ -243,7 +310,12 @@ class QueryHistory:
         return query_id
 
     def record_metrics(self, metrics: QueryMetrics) -> None:
-        """Record performance metrics for a query."""
+        """
+        Records performance metrics for a specific query.
+
+        Args:
+            metrics: A `QueryMetrics` object containing the performance data.
+        """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
@@ -268,7 +340,15 @@ class QueryHistory:
         )
 
     def get_recent(self, limit: int = 100) -> list[QueryRecord]:
-        """Get recent queries."""
+        """
+        Retrieves the most recent query records.
+
+        Args:
+            limit: The maximum number of records to retrieve.
+
+        Returns:
+            A list of `QueryRecord` objects.
+        """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
@@ -294,7 +374,21 @@ class QueryHistory:
         query_type: str | None = None,
         limit: int = 100,
     ) -> list[QueryRecord]:
-        """Search query history with filters."""
+        """
+        Searches the query history with various filters.
+
+        Args:
+            text: A string to search for in the original or translated SQL.
+            status: Filter by query status (e.g., 'SUCCESS', 'ERROR').
+            start_time: The minimum timestamp for records to include.
+            end_time: The maximum timestamp for records to include.
+            database: Filter by the database name.
+            query_type: Filter by the type of query (e.g., 'SELECT', 'CREATE').
+            limit: The maximum number of records to return.
+
+        Returns:
+            A list of matching `QueryRecord` objects.
+        """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
@@ -342,7 +436,15 @@ class QueryHistory:
         return [record for row in result if (record := self._row_to_record(row)) is not None]
 
     def get_by_id(self, query_id: str) -> QueryRecord | None:
-        """Get a specific query by ID."""
+        """
+        Retrieves a specific query record by its unique `query_id`.
+
+        Args:
+            query_id: The ID of the query to retrieve.
+
+        Returns:
+            A `QueryRecord` object if found, otherwise None.
+        """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
@@ -359,7 +461,16 @@ class QueryHistory:
         return self._row_to_record(result) if result else None
 
     def get_statistics(self, start_time: datetime, end_time: datetime) -> QueryStatistics:
-        """Get query statistics for a time period."""
+        """
+        Calculates and returns aggregated statistics for a given time period.
+
+        Args:
+            start_time: The beginning of the time period.
+            end_time: The end of the time period.
+
+        Returns:
+            A `QueryStatistics` object with the aggregated data.
+        """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
@@ -447,13 +558,14 @@ class QueryHistory:
 
     def clear_history(self, before_date: datetime | None = None) -> int:
         """
-        Clear query history.
+        Clears query history records from the database.
 
         Args:
-            before_date: If provided, only clear queries before this date.
+            before_date: If provided, only records older than this date will be
+                         deleted. If None, all history is cleared.
 
         Returns:
-            Number of records deleted.
+            The number of records deleted.
         """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
@@ -497,14 +609,26 @@ class QueryHistory:
         return count_result[0] if count_result else 0
 
     def export_json(self, output_path: str, filters: dict[str, Any] | None = None) -> None:
-        """Export query history to JSON."""
+        """
+        Exports query history to a JSON file.
+
+        Args:
+            output_path: The path to the output JSON file.
+            filters: Optional dictionary of filters to apply, passed to the `search` method.
+        """
         queries = self.search(**(filters or {}), limit=10000)
 
         with open(output_path, "w") as f:
             json.dump([asdict(q) for q in queries], f, indent=2, default=str)
 
     def export_csv(self, output_path: str, columns: list[str] | None = None) -> None:
-        """Export query history to CSV."""
+        """
+        Exports query history to a CSV file using DuckDB's `COPY` command.
+
+        Args:
+            output_path: The path to the output CSV file.
+            columns: An optional list of column names to include in the export.
+        """
         if not self._connection:
             raise RuntimeError("QueryHistory connection not set. Call connect() first.")
 
@@ -520,12 +644,14 @@ class QueryHistory:
         """)
 
     def close(self) -> None:
-        """Reset the history - connection is managed externally."""
+        """
+        Resets the history manager's state. The connection itself is managed externally.
+        """
         self._connection = None
         self._initialized = False
 
     def _extract_query_type(self, sql: str) -> str | None:
-        """Extract the query type from SQL."""
+        """A simple method to extract the query type from a SQL string."""
         sql_upper = sql.strip().upper()
         for query_type in ["SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "TRUNCATE"]:
             if sql_upper.startswith(query_type):
@@ -533,7 +659,7 @@ class QueryHistory:
         return None
 
     def _insert_history_record(self, record: dict[str, Any]) -> None:
-        """Insert a record into the history table."""
+        """Inserts a new record into the `query_history` table."""
         assert self._connection is not None  # For mypy
         schema_name = self._get_schema_name()
 
@@ -546,14 +672,22 @@ class QueryHistory:
 
         self._connection.execute(
             f"""
-            INSERT INTO {schema_name}.query_history ({", ".join(columns)})
-            VALUES ({", ".join(placeholders)})
+            INSERT INTO {schema_name}.query_history ({', '.join(columns)})
+            VALUES ({', '.join(placeholders)})
         """,
             values,
         )
 
     def _row_to_record(self, row: Any) -> QueryRecord | None:
-        """Convert a database row to a QueryRecord."""
+        """
+        Converts a raw database row into a structured `QueryRecord` object.
+
+        Args:
+            row: The database row to convert.
+
+        Returns:
+            A `QueryRecord` object, or None if the input row is empty.
+        """
         if not row:
             return None
 

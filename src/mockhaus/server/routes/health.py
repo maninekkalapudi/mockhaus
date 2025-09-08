@@ -1,4 +1,8 @@
-"""Health check endpoints."""
+"""
+This module defines the health check endpoint for the Mockhaus server.
+
+It provides a simple way to verify that the server is running and responsive.
+"""
 
 import time
 from typing import Any
@@ -16,9 +20,11 @@ _start_time = time.time()
 @router.get("/health", response_model=HealthResponse)
 async def health_check() -> Any:
     """
-    Health check endpoint.
+    Provides a health check endpoint for monitoring the server's status.
 
-    Returns the server status, version, and uptime.
+    Returns:
+        A `HealthResponse` object containing the server's status, version,
+        and uptime.
     """
     uptime = time.time() - _start_time
 

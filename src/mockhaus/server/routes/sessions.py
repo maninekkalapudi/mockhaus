@@ -1,4 +1,11 @@
-"""Session management endpoints."""
+"""
+This module defines the API endpoints for managing user sessions.
+
+It provides routes to create, list, retrieve, and terminate sessions, as well
+as an endpoint to manually trigger the cleanup of expired sessions. These
+endpoints are the primary interface for clients to interact with the server's
+multi-tenancy and state management features.
+"""
 
 from typing import Any
 
@@ -12,7 +19,15 @@ router = APIRouter(tags=["sessions"])
 
 
 class CreateSessionRequest(BaseModel):
-    """Request model for creating a session."""
+    """
+    Represents the request model for creating a new session.
+
+    Attributes:
+        session_id: An optional, client-provided ID for the session.
+        type: The type of session to create ('memory' or 'persistent').
+        ttl_seconds: An optional Time-To-Live for the session in seconds.
+        storage: A dictionary with storage configuration for persistent sessions.
+    """
 
     session_id: str | None = None
     type: str = "memory"  # "memory" or "persistent"
@@ -23,9 +38,11 @@ class CreateSessionRequest(BaseModel):
 @router.post("/sessions", response_model=dict[str, Any])
 async def create_session(request: CreateSessionRequest) -> dict[str, Any]:
     """
-    Create a new session (memory or persistent).
+    Creates a new user session (either in-memory or persistent).
 
-    For persistent sessions, provide storage configuration:
+    For persistent sessions, a storage configuration must be provided in the
+    request body. Example for a local file-based persistent session:
+    ```json
     {
         "type": "persistent",
         "storage": {
@@ -33,6 +50,13 @@ async def create_session(request: CreateSessionRequest) -> dict[str, Any]:
             "path": "/path/to/database.db"
         }
     }
+    ```
+
+    Args:
+        request: A `CreateSessionRequest` object with the session details.
+
+    Returns:
+        A dictionary containing the details of the newly created session.
     """
     session_manager = await server_state.get_session_manager()
 
@@ -108,13 +132,14 @@ async def list_sessions() -> dict[str, Any]:
 @router.get("/sessions/{session_id}", response_model=dict[str, Any])
 async def get_session_info(session_id: str) -> dict[str, Any]:
     """
-    Get information about a specific session.
+    Retrieves detailed information about a specific session.
 
     Args:
-        session_id: Session ID to retrieve information for
+        session_id: The unique identifier of the session to retrieve.
 
     Returns:
-        Session information including status, creation time, and metadata
+        A dictionary containing the session's information, including its status,
+        creation time, and metadata.
     """
     session_manager = await server_state.get_session_manager()
 
@@ -134,13 +159,13 @@ async def get_session_info(session_id: str) -> dict[str, Any]:
 @router.delete("/sessions/{session_id}", response_model=dict[str, Any])
 async def terminate_session(session_id: str) -> dict[str, Any]:
     """
-    Terminate and remove a specific session.
+    Terminates and removes a specific session, cleaning up its resources.
 
     Args:
-        session_id: Session ID to terminate
+        session_id: The unique identifier of the session to terminate.
 
     Returns:
-        Success status and termination confirmation
+        A confirmation message indicating the success of the termination.
     """
     session_manager = await server_state.get_session_manager()
 
@@ -160,10 +185,10 @@ async def terminate_session(session_id: str) -> dict[str, Any]:
 @router.post("/sessions/cleanup", response_model=dict[str, Any])
 async def cleanup_expired_sessions() -> dict[str, Any]:
     """
-    Force cleanup of expired sessions.
+    Manually triggers the cleanup of all expired sessions.
 
     Returns:
-        Number of sessions that were cleaned up
+        A dictionary indicating the number of sessions that were cleaned up.
     """
     session_manager = await server_state.get_session_manager()
 

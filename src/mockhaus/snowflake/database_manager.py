@@ -1,9 +1,12 @@
 """
-This module provides a manager for handling Snowflake database DDL commands.
+This module provides a manager for handling Snowflake-like database DDL commands.
 
-It is responsible for emulating commands like `CREATE DATABASE`, `DROP DATABASE`,
-`USE DATABASE`, and `SHOW DATABASES`. It manages the database files on the
-local filesystem, typically within a `databases` directory.
+It defines the `SnowflakeDatabaseManager` class, which is responsible for emulating
+commands such as `CREATE DATABASE`, `DROP DATABASE`, `USE DATABASE`, and
+`SHOW DATABASES`. Since Mockhaus uses an in-memory DuckDB instance for each
+session, this manager simulates multiple databases by using DuckDB's ability to
+attach multiple in-memory databases, aliasing them to provide a multi-database
+feel within a single session.
 """
 
 import re
@@ -12,7 +15,13 @@ import duckdb
 
 
 class SnowflakeDatabaseManager:
-    """Handles Snowflake database DDL commands like CREATE DATABASE, USE DATABASE."""
+    """
+    Handles Snowflake database DDL commands like CREATE, USE, and DROP DATABASE.
+
+    This class emulates Snowflake's database management by using DuckDB's
+    `ATTACH` and `DETACH` commands to manage multiple in-memory databases within
+    a single connection. It tracks the currently active database for the session.
+    """
 
     def __init__(self, connection: duckdb.DuckDBPyConnection | None = None):
         """
@@ -48,7 +57,10 @@ class SnowflakeDatabaseManager:
 
     def execute_database_ddl(self, sql: str) -> dict:
         """
-        Execute database DDL command.
+        Executes a database DDL command.
+
+        It parses the SQL and delegates to the appropriate handler method
+        (e.g., `_create_database`, `_use_database`).
 
         Args:
             sql: Database DDL SQL to execute
@@ -70,7 +82,18 @@ class SnowflakeDatabaseManager:
         return {"success": False, "error": f"Unsupported database DDL: {sql}"}
 
     def _create_database(self, sql: str) -> dict:
-        """Handle CREATE DATABASE command."""
+        """
+        Handles the `CREATE DATABASE` command.
+
+        This simulates creating a new database by attaching a new in-memory
+        database to the current DuckDB connection with the specified name as an alias.
+
+        Args:
+            sql: The `CREATE DATABASE` SQL statement.
+
+        Returns:
+            A result dictionary.
+        """
         # Parse database name from SQL
         # Supports: CREATE DATABASE my_db, CREATE DATABASE "my db", CREATE DATABASE IF NOT EXISTS my_db
         pattern = r'CREATE\s+DATABASE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:"([^"]+)"|(\w+))'
@@ -102,7 +125,18 @@ class SnowflakeDatabaseManager:
             return {"success": False, "error": f"Failed to create database '{db_name_raw}': {str(e)}"}
 
     def _drop_database(self, sql: str) -> dict:
-        """Handle DROP DATABASE command."""
+        """
+        Handles the `DROP DATABASE` command.
+
+        This simulates dropping a database by detaching it from the current
+        DuckDB connection.
+
+        Args:
+            sql: The `DROP DATABASE` SQL statement.
+
+        Returns:
+            A result dictionary.
+        """
         # Parse database name
         pattern = r'DROP\s+DATABASE\s+(?:IF\s+EXISTS\s+)?(?:"([^"]+)"|(\w+))'
         match = re.search(pattern, sql, re.IGNORECASE)
@@ -139,7 +173,18 @@ class SnowflakeDatabaseManager:
             return {"success": False, "error": f"Failed to drop database '{db_name_raw}': {str(e)}"}
 
     def _use_database(self, sql: str) -> dict:
-        """Handle USE DATABASE command."""
+        """
+        Handles the `USE DATABASE` command.
+
+        This switches the active database context for the session by issuing a
+        `USE` command to the underlying DuckDB connection.
+
+        Args:
+            sql: The `USE DATABASE` SQL statement.
+
+        Returns:
+            A result dictionary.
+        """
         # Parse database name - supports both "USE database_name" and "USE DATABASE database_name"
         pattern = r'USE\s+(?:DATABASE\s+)?(?:"([^"]+)"|(\w+))'
         match = re.search(pattern, sql, re.IGNORECASE)
@@ -166,7 +211,15 @@ class SnowflakeDatabaseManager:
             return {"success": False, "error": f"Failed to switch to database '{db_name_raw}': {str(e)}"}
 
     def _show_databases(self) -> dict:
-        """Handle SHOW DATABASES command."""
+        """
+        Handles the `SHOW DATABASES` command.
+
+        This lists the default `main` database and all other in-memory databases
+        that have been attached during the session.
+
+        Returns:
+            A result dictionary containing the list of databases.
+        """
         try:
             # Show main database and attached databases
             databases = []
