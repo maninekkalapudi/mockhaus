@@ -1,5 +1,6 @@
 """Tests for Mockhaus data ingestion functionality."""
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,7 +67,7 @@ class TestDataIngestion(unittest.TestCase):
 
     def test_create_external_stage_with_url(self) -> None:
         """Test creating an EXTERNAL stage with URL."""
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         sql = f"CREATE STAGE test_external_stage URL = '{file_url}'"
 
         result = self.executor.execute_snowflake_sql(sql)
@@ -95,7 +96,8 @@ class TestDataIngestion(unittest.TestCase):
         assert stage.stage_type == "EXTERNAL"
         assert stage.url == s3_url
         # Should create local path under external/s3/
-        assert "external/s3/my-bucket/data" in stage.local_path
+        expected_path = os.path.join("external", "s3", "my-bucket", "data")
+        assert expected_path in stage.local_path
 
     def test_drop_stage(self) -> None:
         """Test dropping a stage."""
@@ -176,7 +178,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
 
         # Create stage pointing to test data
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         stage_sql = f"CREATE STAGE test_data_stage URL = '{file_url}'"
         result = self.executor.execute_snowflake_sql(stage_sql)
         assert result.success
@@ -218,7 +220,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
 
         # Create stage pointing to test data
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         stage_sql = f"CREATE STAGE test_data_stage2 URL = '{file_url}'"
         result = self.executor.execute_snowflake_sql(stage_sql)
         assert result.success
@@ -277,7 +279,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
 
         # Create stage
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         stage_sql = f"CREATE STAGE test_error_stage URL = '{file_url}'"
         result = self.executor.execute_snowflake_sql(stage_sql)
         assert result.success
@@ -303,7 +305,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
 
         # Create stage
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         stage_sql = f"CREATE STAGE test_error_stage2 URL = '{file_url}'"
         result = self.executor.execute_snowflake_sql(stage_sql)
         assert result.success
@@ -423,7 +425,7 @@ class TestDataIngestion(unittest.TestCase):
         stage_manager = self.stage_manager
 
         # Test valid stage reference (directory exists)
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         stage_manager.create_stage("valid_stage", "EXTERNAL", file_url)
         assert stage_manager.validate_stage_access("@valid_stage/")
 
@@ -449,7 +451,7 @@ class TestDataIngestion(unittest.TestCase):
         assert result.success
 
         # Create stage
-        file_url = f"file://{self.test_data_dir}"
+        file_url = f"file://{self.test_data_dir.as_posix()}"
         stage_sql = f"CREATE STAGE complex_stage URL = '{file_url}'"
         result = self.executor.execute_snowflake_sql(stage_sql)
         assert result.success

@@ -6,6 +6,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import duckdb
+import os
 
 
 @dataclass
@@ -71,6 +72,8 @@ class MockStageManager:
         Path(local_path).mkdir(parents=True, exist_ok=True)
 
         # Create stage object
+        if url and url.startswith("file://"): 
+            url = "file://" + str(Path(url[7:]).as_posix())
         stage = Stage(name=name, stage_type=stage_type, url=url, local_path=local_path, properties=properties)
 
         # Store in system table
@@ -89,10 +92,14 @@ class MockStageManager:
                 # Parse URL to create meaningful local path
                 parsed = urlparse(url)
                 if parsed.scheme in ["s3", "gcs", "azure"]:
-                    return str(self.external_path / parsed.scheme / (parsed.netloc + parsed.path).strip("/"))
+                    path = os.path.join(self.external_path, parsed.scheme, parsed.netloc, parsed.path.strip("/"))
+                    return os.path.normpath(path)
                 if parsed.scheme == "file":
                     # For file:// URLs, use the actual local path
-                    return parsed.path
+                    path = parsed.path
+                    if parsed.netloc:
+                        path = parsed.netloc + path
+                    return str(Path(path))
                 return str(self.external_path / name)
             return str(self.external_path / name)
         # Default to named stage

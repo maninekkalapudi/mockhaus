@@ -3,6 +3,7 @@
 import csv
 import os
 import tempfile
+from pathlib import Path
 
 import duckdb
 
@@ -22,7 +23,7 @@ class TestEnhancedCSVCopyInto:
         self.translator = CopyIntoTranslator(self.stage_manager, self.format_manager)
 
         # Create a temporary directory for test files
-        self.temp_dir = tempfile.mkdtemp()
+        self.temp_dir = Path(tempfile.mkdtemp())
 
     def teardown_method(self):
         """Clean up test fixtures."""
@@ -59,7 +60,7 @@ class TestEnhancedCSVCopyInto:
             f.write("2|Bob|bob@test.com\n")
 
         # Create stage pointing to temp directory
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR, email VARCHAR)")
@@ -89,7 +90,7 @@ class TestEnhancedCSVCopyInto:
             f.write(b"id,name\r\n1,Alice\r\n2,Bob\r\n")
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR)")
@@ -116,7 +117,7 @@ class TestEnhancedCSVCopyInto:
         self._create_test_csv("test.csv", test_data)
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR)")
@@ -144,7 +145,7 @@ class TestEnhancedCSVCopyInto:
         self._create_test_csv("utf8.csv", test_data, encoding="utf-8")
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR)")
@@ -177,7 +178,7 @@ class TestEnhancedCSVCopyInto:
             f.write("4,N/A,david@test.com\n")  # N/A string (not first)
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR, email VARCHAR)")
@@ -211,7 +212,7 @@ class TestEnhancedCSVCopyInto:
             f.write("3\n")  # Missing column
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR)")
@@ -239,7 +240,7 @@ class TestEnhancedCSVCopyInto:
             f.write(b'3|"Charlie"|"charlie@test.com"\r\n')
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR, email VARCHAR)")
@@ -281,7 +282,7 @@ class TestEnhancedCSVCopyInto:
         self._create_test_csv("simple.csv", test_data)
 
         # Create stage
-        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir}")
+        self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{self.temp_dir.as_posix()}")
 
         # Create table
         self.conn.execute("CREATE TABLE test_table (id INT, name VARCHAR)")
