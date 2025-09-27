@@ -40,7 +40,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage pointing to temp directory using EXTERNAL type for file:// URLs
-            self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("test_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table with correct schema
             self.conn.execute("""
@@ -90,7 +90,7 @@ class TestParquetCopyIntoReal:
                 shutil.copy2(source_file, dest_file)
 
                 # Create stage
-                self.stage_manager.create_stage(f"stage_{compression}", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+                self.stage_manager.create_stage(f"stage_{compression}", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
                 # Create target table (drop if exists from previous iteration)
                 self.conn.execute(f"DROP TABLE IF EXISTS employees_{compression}")
@@ -135,7 +135,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage
-            self.stage_manager.create_stage("null_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("null_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table
             self.conn.execute("""
@@ -177,7 +177,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage
-            self.stage_manager.create_stage("binary_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("binary_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table
             self.conn.execute("""
@@ -221,7 +221,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage
-            self.stage_manager.create_stage("inline_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("inline_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table
             self.conn.execute("""
@@ -262,7 +262,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage
-            self.stage_manager.create_stage("unsupported_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("unsupported_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table
             self.conn.execute("""
@@ -311,7 +311,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage
-            self.stage_manager.create_stage("lzo_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("lzo_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table
             self.conn.execute("""
@@ -355,7 +355,7 @@ class TestParquetCopyIntoReal:
             shutil.copy2(source_file, dest_file)
 
             # Create stage
-            self.stage_manager.create_stage("auto_stage", stage_type="EXTERNAL", url=f"file://{tmpdir}")
+            self.stage_manager.create_stage("auto_stage", stage_type="EXTERNAL", url=f"file://{Path(tmpdir).as_posix()}")
 
             # Create target table
             self.conn.execute("""
