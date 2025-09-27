@@ -110,7 +110,7 @@ class TestDataPipelineMergeWorkflow:
         # Create external stage pointing to temp directory
         stage_sql = f"""
         CREATE STAGE customer_data_stage
-        URL = 'file://{temp_files_dir}'
+        URL = 'file://{temp_files_dir.as_posix()}'
         FILE_FORMAT = csv_customer_format
         """
 
