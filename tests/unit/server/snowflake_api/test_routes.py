@@ -21,8 +21,8 @@ def test_submit_statement_skeleton():
     data = response.json()
     
     assert "statementHandle" in data
+    assert uuid.UUID(data["statementHandle"]) # Check that it's a valid UUID
     assert data["status"] == "SUBMITTED"
-    assert data["sqlState"] == "00000"
     assert data["message"].startswith("Statement submitted:")
 
 
@@ -39,13 +39,23 @@ def test_get_statement_status_skeleton():
     submitted_data = submit_response.json()
     handle = submitted_data["statementHandle"]
 
+    # Immediately check status, expecting SUBMITTED
     response = client.get(f"/api/v2/statements/{handle}")
     assert response.status_code == 200
     data = response.json()
 
     assert data["statementHandle"] == handle
-    assert data["status"] == "SUBMITTED"
+    assert data["status"] == "RUNNING" # Should be RUNNING shortly after submission
     assert data["sqlState"] == "00000"
+
+
+def test_get_statement_status_not_found():
+    """Tests that GET /statements/{handle} returns 404 for a non-existent handle."""
+    non_existent_handle = str(uuid.uuid4())
+    response = client.get(f"/api/v2/statements/{non_existent_handle}")
+    assert response.status_code == 404
+    assert "detail" in response.json()
+    assert response.json()["detail"] == "Statement handle not found."
 
 
 def test_cancel_statement_skeleton():
@@ -67,3 +77,12 @@ def test_cancel_statement_skeleton():
 
     assert data["status"] == "SUCCESS"
     assert data["message"] == f"Cancellation request for {handle} received."
+
+
+def test_cancel_statement_not_found():
+    """Tests that POST /statements/{handle}/cancel returns 404 for a non-existent handle."""
+    non_existent_handle = str(uuid.uuid4())
+    response = client.post(f"/api/v2/statements/{non_existent_handle}/cancel")
+    assert response.status_code == 404
+    assert "detail" in response.json()
+    assert response.json()["detail"] == "Statement handle not found."

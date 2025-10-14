@@ -123,6 +123,8 @@ class StatementResponse(BaseModel):
         result_set_meta_data: Metadata about the result set.
         result_set: The result set data.
     """
+    model_config = ConfigDict(populate_by_name=True)
+
     statement_handle: str = Field(..., alias="statementHandle")
     status: StatementStatus
     sql_state: str = Field(..., alias="sqlState")

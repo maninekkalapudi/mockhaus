@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
   - Created `src/mockhaus/server/snowflake_api/routes.py` with placeholder endpoints.
   - Integrated the new API router into `src/mockhaus/server/app.py`.
   - Added basic skeleton tests in `tests/unit/server/snowflake_api/test_routes.py`.
+- **Feature: Implement AsyncExecutor for Background Statement Execution (Issue #9)**
+  - Created `src/mockhaus/server/snowflake_api/async_executor.py` for simulating asynchronous tasks.
+  - Modified `src/mockhaus/server/snowflake_api/statement_manager.py` to use `AsyncExecutor` for background statement execution, updating status from `SUBMITTED` to `RUNNING` then `SUCCEEDED`.
+  - Updated unit tests in `tests/unit/server/snowflake_api/test_statement_manager.py` and `tests/unit/server/snowflake_api/test_routes.py` to reflect asynchronous behavior and ensure reliable testing.
 - **Refactor: Update Pydantic Configuration**
   - Fixed a deprecation warning by refactoring Pydantic models to use `ConfigDict`.
 
