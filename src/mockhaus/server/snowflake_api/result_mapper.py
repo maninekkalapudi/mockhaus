@@ -49,10 +49,10 @@ def map_duckdb_to_snowflake_results(
     partition_info = [PartitionInfo(rowCount=len(data), uncompressedSize=0, compressedSize=0)]
 
     result_set_meta_data = ResultSetMetadata(
-        numRows=len(data),
+        num_rows=len(data),
         format="jsonv2",
-        rowType=row_types,
-        partitionInfo=partition_info,
+        row_type=row_types,
+        partition_info=partition_info,
     )
 
     return {"resultSet": result_set, "resultSetMetaData": result_set_meta_data}
