@@ -12,6 +12,11 @@ All notable changes to this project will be documented in this file.
   - Created `src/mockhaus/server/snowflake_api/async_executor.py` for simulating asynchronous tasks.
   - Modified `src/mockhaus/server/snowflake_api/statement_manager.py` to use `AsyncExecutor` for background statement execution, updating status from `SUBMITTED` to `RUNNING` then `SUCCEEDED`.
   - Updated unit tests in `tests/unit/server/snowflake_api/test_statement_manager.py` and `tests/unit/server/snowflake_api/test_routes.py` to reflect asynchronous behavior and ensure reliable testing.
+- **Feature: Integrate MockhausExecutor and Map Results to Snowflake Format (Issue #10)**
+  - Created `src/mockhaus/server/snowflake_api/result_mapper.py` for transforming DuckDB results to Snowflake format.
+  - Modified `src/mockhaus/server/snowflake_api/async_executor.py` to use `MockhausExecutor` for real SQL execution and `ResultMapper` for formatting.
+  - Updated `src/mockhaus/server/snowflake_api/statement_manager.py` to populate `StatementResponse` with detailed results and handle errors from the executor.
+  - Updated unit tests in `tests/unit/server/snowflake_api/test_statement_manager.py` and `tests/unit/server/snowflake_api/test_routes.py` to assert result sets and handle failed queries.
 - **Refactor: Update Pydantic Configuration**
   - Fixed a deprecation warning by refactoring Pydantic models to use `ConfigDict`.
 
