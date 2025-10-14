@@ -45,7 +45,7 @@ class StatementManager:
 
     async def _execute_statement_in_background(self, statement_handle: str, sql: str):
         """
-        Simulates the background execution of a statement and updates its status.
+        Executes the statement in the background and updates its status and results.
         """
         # Update status to RUNNING
         if statement_handle in self._statements:
@@ -53,15 +53,26 @@ class StatementManager:
             self._statements[statement_handle].message = f"Statement running: {sql[:50]}..."
             print(f"Statement {statement_handle} status updated to RUNNING.")
 
-        # Simulate work
-        await self._async_executor.execute(statement_handle)
+        # Execute the SQL using AsyncExecutor
+        execution_result = await self._async_executor.execute(statement_handle, sql)
 
-        # Update status to SUCCEEDED
+        # Update status based on execution result
         if statement_handle in self._statements:
-            self._statements[statement_handle].status = StatementStatus.SUCCEEDED
-            self._statements[statement_handle].message = f"Statement succeeded: {sql[:50]}..."
-            self._statements[statement_handle].dateTime = datetime.now(timezone.utc).isoformat()
-            print(f"Statement {statement_handle} status updated to SUCCEEDED.")
+            current_response = self._statements[statement_handle]
+            current_response.date_time = datetime.now(timezone.utc).isoformat()
+
+            if execution_result["status"] == "SUCCEEDED":
+                current_response.status = StatementStatus.SUCCEEDED
+                current_response.message = f"Statement succeeded: {sql[:50]}..."
+                if execution_result["results"]:
+                    current_response.result_set = execution_result["results"]["resultSet"]
+                    current_response.result_set_meta_data = execution_result["results"]["resultSetMetaData"]
+                print(f"Statement {statement_handle} status updated to SUCCEEDED.")
+            else:
+                current_response.status = StatementStatus.FAILED
+                current_response.message = execution_result["error_message"]
+                current_response.error_code = execution_result["error_code"]
+                print(f"Statement {statement_handle} status updated to FAILED: {execution_result["error_message"]}")
 
     def get_statement_status(self, handle: str) -> Optional[StatementResponse]:
         """

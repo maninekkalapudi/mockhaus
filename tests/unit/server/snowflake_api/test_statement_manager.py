@@ -4,9 +4,9 @@ from mockhaus.server.snowflake_api.statement_manager import StatementManager
 from mockhaus.server.snowflake_api.models import StatementStatus, CancellationResponse
 
 
-async def test_submit_statement():
+async def test_submit_statement_success():
     manager = StatementManager()
-    sql_statement = "SELECT 1;"
+    sql_statement = "SELECT 1 as col1, 'hello' as col2;"
     response = manager.submit_statement(sql_statement)
 
     assert response is not None
@@ -20,6 +20,28 @@ async def test_submit_statement():
     updated_response = manager.get_statement_status(response.statement_handle)
     assert updated_response.status == StatementStatus.SUCCEEDED
     assert updated_response.message.startswith("Statement succeeded:")
+    assert updated_response.result_set is not None
+    assert updated_response.result_set_meta_data is not None
+    assert updated_response.result_set == [{'COL1': 1, 'COL2': 'hello'}]
+    assert updated_response.result_set_meta_data.num_rows == 1
+
+
+async def test_submit_statement_failure():
+    manager = StatementManager()
+    sql_statement = "SELECT * FROM non_existent_table;"
+    response = manager.submit_statement(sql_statement)
+
+    assert response is not None
+    assert uuid.UUID(response.statement_handle)  # Check if it's a valid UUID
+    assert response.status == StatementStatus.SUBMITTED
+
+    # Allow background task to complete
+    await asyncio.sleep(0.5)
+
+    updated_response = manager.get_statement_status(response.statement_handle)
+    assert updated_response.status == StatementStatus.FAILED
+    assert updated_response.error_code == "00001"
+    assert "non_existent_table" in updated_response.message
 
 
 async def test_get_statement_status_existing():
