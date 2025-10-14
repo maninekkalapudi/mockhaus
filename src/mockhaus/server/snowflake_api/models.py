@@ -15,7 +15,7 @@ Each class corresponds to a specific JSON object structure defined in the
 Snowflake API documentation, using Pydantic's features for validation,
 serialization, and handling of optional fields and aliases.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from enum import Enum
 
@@ -84,6 +84,8 @@ class ResultSetMetadata(BaseModel):
         row_type: A list of RowType objects, one for each column.
         partition_info: A list of PartitionInfo objects, one for each partition.
     """
+    model_config = ConfigDict(populate_by_name=True)
+
     num_rows: int = Field(..., alias="numRows")
     format: str
     row_type: List[RowType] = Field(..., alias="rowType")
@@ -140,3 +142,5 @@ class CancellationResponse(BaseModel):
     """
     status: str
     message: str
+
+

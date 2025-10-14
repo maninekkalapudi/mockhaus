@@ -12,6 +12,7 @@ from .middleware.cors import add_cors_middleware
 from .middleware.debug_logging import add_debug_logging_middleware
 from .middleware.logging import add_logging_middleware
 from .routes import health, query, sessions
+from .snowflake_api import routes as snowflake_routes
 from .state import server_state
 
 
@@ -49,6 +50,7 @@ add_debug_logging_middleware(app, debug=debug_enabled)
 app.include_router(query.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(sessions.router, prefix="/api/v1")
+app.include_router(snowflake_routes.router, prefix="/api/v2")
 
 
 @app.get("/")
