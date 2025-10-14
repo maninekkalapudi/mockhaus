@@ -13,7 +13,7 @@ the process of statement execution, status tracking, and result retrieval.
 """
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from mockhaus.server.snowflake_api.models import (
     StatementRequest,
@@ -21,8 +21,10 @@ from mockhaus.server.snowflake_api.models import (
     CancellationResponse,
     StatementStatus,
 )
+from .statement_manager import StatementManager
 
 router = APIRouter()
+statement_manager = StatementManager()
 
 
 @router.post("/statements", response_model=StatementResponse)
@@ -37,16 +39,8 @@ async def submit_statement(request: StatementRequest) -> StatementResponse:
         A StatementResponse object confirming the submission.
     """
     print(f"Received statement submission: {request.statement[:100]}...")
-
-    # IMPROVED: Create the response object first for better readability.
-    response_body = StatementResponse(
-        statementHandle=str(uuid.uuid4()),
-        status=StatementStatus.SUCCEEDED,
-        sqlState="00000",
-        dateTime=datetime.now(timezone.utc).isoformat(),
-        message="Statement executed successfully.",
-    )
-    return response_body
+    response = statement_manager.submit_statement(request.statement)
+    return response
 
 
 @router.get("/statements/{statement_handle}", response_model=StatementResponse)
@@ -62,16 +56,10 @@ async def get_statement_status(statement_handle: str) -> StatementResponse:
     """
     # IMPROVED: Added a print statement for debugging.
     print(f"Checking status for handle: {statement_handle}")
-
-    # IMPROVED: Create the response object first for better readability.
-    response_body = StatementResponse(
-        statementHandle=statement_handle,
-        status=StatementStatus.SUCCEEDED,
-        sqlState="00000",
-        dateTime=datetime.now(timezone.utc).isoformat(),
-        message="Statement executed successfully.",
-    )
-    return response_body
+    response = statement_manager.get_statement_status(statement_handle)
+    if not response:
+        raise HTTPException(status_code=404, detail="Statement handle not found.")
+    return response
 
 
 @router.post(
@@ -89,8 +77,7 @@ async def cancel_statement(statement_handle: str) -> CancellationResponse:
     """
 
     print(f"Received cancellation request for handle: {statement_handle}")
-
-    response_body = CancellationResponse(
-        status="SUCCESS", message="Statement cancellation completed."
-    )
-    return response_body
+    response = statement_manager.cancel_statement(statement_handle)
+    if not response:
+        raise HTTPException(status_code=404, detail="Statement handle not found.")
+    return response
