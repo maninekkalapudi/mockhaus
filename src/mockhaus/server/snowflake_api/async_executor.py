@@ -1,3 +1,19 @@
+"""
+This module defines the `AsyncExecutor` class, which is responsible for executing
+SQL queries in a non-blocking manner.
+
+It uses the `MockhausExecutor` from a given `SessionContext` to run the actual
+SQL queries against the DuckDB backend. After execution, it maps the results to
+the Snowflake API format using the `result_mapper`.
+
+Key responsibilities include:
+- Receiving SQL statements for execution.
+- Interacting with the `MockhausExecutor` to run queries.
+- Handling both successful and failed query executions.
+- Transforming DuckDB results into the structured format expected by the
+  Snowflake SQL API.
+"""
+
 import asyncio
 import duckdb
 

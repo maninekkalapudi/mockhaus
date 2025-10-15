@@ -1,4 +1,18 @@
-"""FastAPI application setup for Mockhaus server."""
+"""
+This module configures and initializes the FastAPI application for the Mockhaus server.
+
+It sets up the application lifecycle, middleware, and API routers, creating a
+cohesive server that emulates the Snowflake SQL REST API while using DuckDB as
+its backend.
+
+Key responsibilities include:
+- Defining the application's startup and shutdown events, such as initializing
+  the ConcurrentSessionManager.
+- Configuring middleware for CORS, request logging, and optional debug logging.
+- Including API routers for different versions and functionalities, such as the
+  v1 health and query endpoints, and the v2 Snowflake API endpoints.
+- Providing a root endpoint for basic server information.
+"""
 
 import os
 import sys

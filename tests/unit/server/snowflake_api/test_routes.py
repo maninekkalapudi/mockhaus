@@ -1,5 +1,15 @@
 """
-Unit tests for the skeleton Snowflake API routes.
+This module contains unit tests for the Snowflake SQL REST API routes.
+
+It uses FastAPI's TestClient to simulate HTTP requests to the API endpoints
+and verify their behavior in isolation. The tests cover:
+- Successful statement submission and status retrieval.
+- Handling of not-found errors for non-existent statements.
+- Statement cancellation requests.
+- Correct session handling by passing a consistent session ID.
+
+The tests are designed to ensure that the API routes are functioning correctly
+and returning the expected responses, including status codes and JSON payloads.
 """
 import uuid
 from fastapi.testclient import TestClient

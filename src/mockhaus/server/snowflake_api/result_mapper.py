@@ -1,3 +1,21 @@
+"""
+This module provides a function for mapping query results from DuckDB to the
+format expected by the Snowflake SQL REST API.
+
+It takes the raw data and column information from a `QueryResult` and transforms
+it into a structured dictionary containing `resultSet` and `resultSetMetaData`.
+This ensures that the data returned by Mockhaus is compatible with Snowflake
+clients.
+
+Key responsibilities include:
+- Converting column names to uppercase to match Snowflake's case-insensitivity.
+- Generating `RowType` metadata for each column, including a simplified type
+  mapping.
+- Creating placeholder `PartitionInfo` to maintain the structure of the
+  response.
+- Assembling the final `ResultSetMetadata` object.
+"""
+
 from typing import Any, Dict, List, Optional
 
 from mockhaus.server.snowflake_api.models import (

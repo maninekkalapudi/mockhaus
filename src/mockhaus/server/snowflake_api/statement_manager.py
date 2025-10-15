@@ -1,3 +1,22 @@
+
+"""
+This module defines the `StatementManager` class, which is responsible for
+managing the lifecycle of SQL statements submitted to the Snowflake API.
+
+It handles the submission, execution, and status tracking of statements within a
+given session. Each `StatementManager` is tied to a specific `SessionContext`,
+ensuring that statement execution is isolated between different user sessions.
+
+Key responsibilities include:
+- Generating a unique handle for each submitted statement.
+- Storing the state of each statement in memory.
+- Initiating background execution of SQL queries using the `AsyncExecutor`.
+- Updating the statement's status from `SUBMITTED` to `RUNNING` and then to
+  `SUCCEEDED` or `FAILED`.
+- Populating the final response with results or error information.
+- Providing a mechanism to retrieve the status of a statement by its handle.
+"""
+
 import uuid
 import asyncio
 from datetime import datetime, timezone

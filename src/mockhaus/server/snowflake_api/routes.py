@@ -1,15 +1,18 @@
 """
 This module defines the FastAPI routes for emulating the Snowflake SQL REST API.
 
-It includes endpoints for:
-- Submitting a new SQL statement for execution.
-- Checking the status and retrieving the results of a previously submitted statement.
-- Canceling an in-progress statement.
+It provides endpoints for submitting SQL statements, checking their status, and
+canceling their execution. These routes are designed to be compatible with the
+official Snowflake SQL API, allowing clients to interact with Mockhaus as if it
+were a genuine Snowflake instance.
 
-These routes are designed to be compatible with the official Snowflake SQL API,
-allowing existing Snowflake clients and tools to interact with Mockhaus as if it
-were a genuine Snowflake instance. The handlers for these routes will orchestrate
-the process of statement execution, status tracking, and result retrieval.
+Key features include:
+- Asynchronous statement submission for non-blocking execution.
+- Session management to ensure that each user has a separate, stateful
+  environment.
+- Dependency injection for accessing the `ConcurrentSessionManager` and other
+  shared resources.
+- Pydantic models for request and response validation, ensuring data consistency.
 """
 import uuid
 from datetime import datetime, timezone

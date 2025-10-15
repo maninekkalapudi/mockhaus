@@ -1,3 +1,21 @@
+"""
+This module contains unit tests for the `StatementManager` class, which is
+responsible for managing the lifecycle of SQL statements in the Snowflake API.
+
+These tests cover the asynchronous execution flow of statements, from submission
+to completion. Key aspects tested include:
+- Successful statement execution, ensuring the status transitions from `SUBMITTED`
+  to `SUCCEEDED` and that results are correctly populated.
+- Failed statement execution, verifying that the status becomes `FAILED` and that
+  error information is recorded.
+- Retrieval of statement status by its handle.
+- Handling of non-existent statement handles.
+- Statement cancellation requests.
+
+`asyncio.sleep` is used to allow background tasks to complete, ensuring that the
+asynchronous nature of the `StatementManager` is reliably tested.
+"""
+
 import uuid
 import asyncio
 from mockhaus.server.snowflake_api.statement_manager import StatementManager

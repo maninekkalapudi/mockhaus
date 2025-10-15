@@ -1,19 +1,20 @@
 """
-This module defines the Pydantic models used for data validation and serialization
-in the context of interacting with the Snowflake SQL REST API. These models represent
-the structured data for requests and responses, ensuring that all communication
-with the API is type-safe and conforms to the expected format.
+This module defines the Pydantic models for the Snowflake SQL REST API.
 
-The models cover various aspects of the API, including:
-- Statement submission and status tracking.
-- Result set metadata and data handling.
-- Column and partition information.
-- Error reporting.
-- Cancellation requests.
+These models are used for data validation, serialization, and ensuring type safety
+when interacting with the API. Each class corresponds to a specific JSON object
+structure in the Snowflake API documentation.
 
-Each class corresponds to a specific JSON object structure defined in the
-Snowflake API documentation, using Pydantic's features for validation,
-serialization, and handling of optional fields and aliases.
+Key models include:
+- `StatementRequest`: For submitting a new SQL statement.
+- `StatementResponse`: For returning the status and results of a statement.
+- `ResultSetMetadata`: For describing the structure of the result set.
+- `RowType`: For describing the columns in the result set.
+- `StatementStatus`: An enumeration for the possible states of a statement.
+
+The models use Pydantic features like `Field` aliases and `ConfigDict` to map
+between camelCase JSON and snake_case Python attributes, ensuring compatibility
+with the Snowflake API.
 """
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
