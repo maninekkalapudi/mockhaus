@@ -5,7 +5,7 @@ import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 
 from ..banner import print_server_banner
 from .middleware.cors import add_cors_middleware
@@ -14,6 +14,8 @@ from .middleware.logging import add_logging_middleware
 from .routes import health, query, sessions
 from .snowflake_api import routes as snowflake_routes
 from .state import server_state
+from .concurrent_session_manager import ConcurrentSessionManager, SessionContext
+from .dependencies import get_session_manager
 
 
 @asynccontextmanager
@@ -23,9 +25,11 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     host = os.environ.get("MOCKHAUS_HOST", "0.0.0.0")
     port = int(os.environ.get("MOCKHAUS_PORT", "8080"))
     print_server_banner(host, port)
+    await get_session_manager().start()
     yield
     # Shutdown: cleanup server state
     await server_state.shutdown()
+    await get_session_manager().shutdown()
 
 
 # Create FastAPI application

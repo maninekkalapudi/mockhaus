@@ -1,19 +1,18 @@
 import asyncio
 import duckdb
 
-from mockhaus.executor import MockhausExecutor, QueryResult
+from mockhaus.executor import QueryResult
+from mockhaus.server.concurrent_session_manager import SessionContext
 from .result_mapper import map_duckdb_to_snowflake_results
 
 
 class AsyncExecutor:
     """
-    Executes SQL queries asynchronously using MockhausExecutor and maps results.
+    Executes SQL queries asynchronously using MockhausExecutor from a SessionContext and maps results.
     """
 
-    def __init__(self):
-        self._mockhaus_executor = MockhausExecutor()
-        # Ensure connection is established for MockhausExecutor
-        self._mockhaus_executor.connect()
+    def __init__(self, session_context: SessionContext):
+        self._session_context = session_context
 
     async def execute(self, task_id: str, sql: str) -> dict:
         """
@@ -21,7 +20,8 @@ class AsyncExecutor:
         """
         print(f"[AsyncExecutor] Task {task_id} started, executing SQL: {sql[:50]}...")
         try:
-            query_result: QueryResult = self._mockhaus_executor.execute_snowflake_sql(sql)
+            mockhaus_executor = await self._session_context.get_executor()
+            query_result: QueryResult = mockhaus_executor.execute_snowflake_sql(sql)
 
             if query_result.success:
                 mapped_results = None

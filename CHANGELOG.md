@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### 2025-10-15
+
+- **Feature: Integrate ConcurrentSessionManager with v2 API (Issue #11)**
+  - Integrated `ConcurrentSessionManager` with the Snowflake v2 API to enable stateful, persistent sessions across multiple requests.
+  - Modified `src/mockhaus/server/app.py` to manage the lifecycle of the session manager, ensuring it starts and shuts down with the application.
+  - Updated the unit tests in `tests/unit/server/snowflake_api/test_routes.py` to be session-aware, preventing failures by passing a consistent session ID in test requests.
+
 ### 2025-10-14
 
 - **Feature: Initial Snowflake API Skeleton (Issue #6)**

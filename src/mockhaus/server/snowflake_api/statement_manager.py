@@ -8,6 +8,7 @@ from mockhaus.server.snowflake_api.models import (
     StatementStatus,
     CancellationResponse,
 )
+from mockhaus.server.concurrent_session_manager import SessionContext
 from .async_executor import AsyncExecutor
 
 
@@ -19,9 +20,10 @@ class StatementManager:
     It stores statement states in an in-memory dictionary.
     """
 
-    def __init__(self):
+    def __init__(self, session_context: SessionContext):
         self._statements: Dict[str, StatementResponse] = {}
-        self._async_executor = AsyncExecutor()
+        self._session_context = session_context
+        self._async_executor = AsyncExecutor(session_context)
 
     def submit_statement(self, sql: str) -> StatementResponse:
         """

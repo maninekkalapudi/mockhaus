@@ -28,19 +28,24 @@ def test_submit_statement_skeleton():
 
 def test_get_statement_status_skeleton():
     """Tests that the GET /statements/{handle} endpoint returns a successful and complete response."""
+    session_id = f"session-{uuid.uuid4()}"
     # Submit a statement first to get a valid handle
     submit_response = client.post(
         "/api/v2/statements",
         json={
             "statement": "SELECT 1;",
         },
+        headers={"X-Snowflake-Session-ID": session_id},
     )
     assert submit_response.status_code == 200
     submitted_data = submit_response.json()
     handle = submitted_data["statementHandle"]
 
     # Immediately check status, expecting RUNNING
-    response = client.get(f"/api/v2/statements/{handle}")
+    response = client.get(
+        f"/api/v2/statements/{handle}",
+        headers={"X-Snowflake-Session-ID": session_id},
+    )
     assert response.status_code == 200
     data = response.json()
 
@@ -60,18 +65,23 @@ def test_get_statement_status_not_found():
 
 def test_cancel_statement_skeleton():
     """Tests that the POST /statements/{handle}/cancel endpoint returns a successful and complete response."""
+    session_id = f"session-{uuid.uuid4()}"
     # Submit a statement first to get a valid handle
     submit_response = client.post(
         "/api/v2/statements",
         json={
             "statement": "SELECT 1;",
         },
+        headers={"X-Snowflake-Session-ID": session_id},
     )
     assert submit_response.status_code == 200
     submitted_data = submit_response.json()
     handle = submitted_data["statementHandle"]
 
-    response = client.post(f"/api/v2/statements/{handle}/cancel")
+    response = client.post(
+        f"/api/v2/statements/{handle}/cancel",
+        headers={"X-Snowflake-Session-ID": session_id},
+    )
     assert response.status_code == 200
     data = response.json()
 

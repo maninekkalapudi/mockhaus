@@ -2,10 +2,16 @@ import uuid
 import asyncio
 from mockhaus.server.snowflake_api.statement_manager import StatementManager
 from mockhaus.server.snowflake_api.models import StatementStatus, CancellationResponse
+from mockhaus.server.concurrent_session_manager import SessionContext
+from mockhaus.server.models.session import SessionConfig
+from mockhaus.executor import MockhausExecutor
 
 
 async def test_submit_statement_success():
-    manager = StatementManager()
+    # Create a dummy SessionContext for testing
+    session_config = SessionConfig(session_id="test_session")
+    session_context = SessionContext(config=session_config)
+    manager = StatementManager(session_context)
     sql_statement = "SELECT 1 as col1, 'hello' as col2;"
     response = manager.submit_statement(sql_statement)
 
@@ -27,7 +33,10 @@ async def test_submit_statement_success():
 
 
 async def test_submit_statement_failure():
-    manager = StatementManager()
+    # Create a dummy SessionContext for testing
+    session_config = SessionConfig(session_id="test_session")
+    session_context = SessionContext(config=session_config)
+    manager = StatementManager(session_context)
     sql_statement = "SELECT * FROM non_existent_table;"
     response = manager.submit_statement(sql_statement)
 
@@ -45,7 +54,10 @@ async def test_submit_statement_failure():
 
 
 async def test_get_statement_status_existing():
-    manager = StatementManager()
+    # Create a dummy SessionContext for testing
+    session_config = SessionConfig(session_id="test_session")
+    session_context = SessionContext(config=session_config)
+    manager = StatementManager(session_context)
     sql_statement = "SELECT 2;"
     submitted_response = manager.submit_statement(sql_statement)
 
@@ -57,14 +69,20 @@ async def test_get_statement_status_existing():
 
 
 def test_get_statement_status_non_existent():
-    manager = StatementManager()
+    # Create a dummy SessionContext for testing
+    session_config = SessionConfig(session_id="test_session")
+    session_context = SessionContext(config=session_config)
+    manager = StatementManager(session_context)
     non_existent_handle = str(uuid.uuid4())
     response = manager.get_statement_status(non_existent_handle)
     assert response is None
 
 
 async def test_cancel_statement_existing():
-    manager = StatementManager()
+    # Create a dummy SessionContext for testing
+    session_config = SessionConfig(session_id="test_session")
+    session_context = SessionContext(config=session_config)
+    manager = StatementManager(session_context)
     sql_statement = "SELECT 3;"
     submitted_response = manager.submit_statement(sql_statement)
 
@@ -78,7 +96,10 @@ async def test_cancel_statement_existing():
 
 
 def test_cancel_statement_non_existent():
-    manager = StatementManager()
+    # Create a dummy SessionContext for testing
+    session_config = SessionConfig(session_id="test_session")
+    session_context = SessionContext(config=session_config)
+    manager = StatementManager(session_context)
     non_existent_handle = str(uuid.uuid4())
     cancellation_response = manager.cancel_statement(non_existent_handle)
     assert cancellation_response is None
